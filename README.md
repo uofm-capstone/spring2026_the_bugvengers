@@ -2,8 +2,11 @@
 
 # Team CheckMate Fall Semester Documents
 * Timesheet: https://docs.google.com/spreadsheets/d/1ldVO4Gvr_2aZjupZg9wW69blvqsRB30c2dRBAY0WZQE/edit?usp=sharing
+
 * Team Contract: https://livememphis-my.sharepoint.com/:w:/g/personal/jlin8_memphis_edu/IQB3sMx-HenTSaUsp8y8DGxxAUND235XW6lOD3ulTUL1psY?e=QdDQ4u
+
 * Client Meeting Notes: https://docs.google.com/document/d/1zPfrdiE6hBqIzEtFx1Fwb6oAbib8PR-Zi7qnjcjqyOU/edit?usp=sharing
+
 * Demo Day PPT: https://docs.google.com/presentation/d/1palUE6707hiFTgBdnDsijx6uQr8DtyTXJct2VwM_5dw/edit?usp=sharing
 # Tool-Assisted Grading (TAG)
 TAG is a web-based application designed to assist professors and teaching assistants in evaluating and grading students. With this application, you can manage grading student an client survey survey's served by Qualtrics (and more features to come).

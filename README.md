@@ -7,7 +7,7 @@
 
 * Client Meeting Notes: [https://docs.google.com/document/d/1zPfrdiE6hBqIzEtFx1Fwb6oAbib8PR-Zi7qnjcjqyOU/edit?usp=sharing](https://docs.google.com/document/d/1MBrhAsigjD1iNziOoJ8XKvB69SAu503-9WEMtYMG5Go/edit?usp=sharing)
 
-* Demo Day PPT: https://docs.google.com/presentation/d/1palUE6707hiFTgBdnDsijx6uQr8DtyTXJct2VwM_5dw/edit?usp=sharing
+* Demo Day PPT: [https://docs.google.com/presentation/d/1palUE6707hiFTgBdnDsijx6uQr8DtyTXJct2VwM_5dw/edit?usp=sharing](https://docs.google.com/presentation/d/1uWruttHza4RXFavCqQk-JCmfDzW75qkxiA3zujormjY/edit?usp=sharing)
 # Tool-Assisted Grading (TAG)
 TAG is a web-based application designed to assist professors and teaching assistants in evaluating and grading students. With this application, you can manage grading student an client survey survey's served by Qualtrics (and more features to come).
 

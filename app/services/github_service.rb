@@ -26,6 +26,34 @@ class GithubService
     end
   end
 
+  # Fetch commits in date range
+  def commits_in_range(repo, start_date, stop_date)
+    return [] unless @client
+
+    commits = []
+    page = 1
+
+    loop do
+      batch = @client.commits(
+        repo,
+        per_page: 100,
+        page: page,
+        since: start_date,
+        until: stop_date
+      )
+
+      break if batch.empty?
+
+      commits.concat(batch)
+      page += 1
+    end
+
+    commits
+  rescue Octokit::Unauthorized
+    puts "Unauthorized: cannot fetch commits for #{repo}"
+    []
+  end
+
   # Filter commits by username
   def commits_by_user(commits, username)
     commits.select do |c|

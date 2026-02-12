@@ -103,3 +103,7 @@ gem 'levenshtein'
 gem 'fuzzy-string-match'
 
 gem 'cancancan'
+
+# 
+gem 'faraday-retry'
+gem 'faraday-multipart'

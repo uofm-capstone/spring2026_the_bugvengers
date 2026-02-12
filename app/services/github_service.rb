@@ -2,38 +2,28 @@
 require "octokit"
 
 class GithubService
+  CardInfo = Struct.new(:title, :status, :assignees, :fields, :type)
+  CBPResult = Struct.new(:commit_count, :lines_added, :lines_removed, :lines_changed)
+
   def initialize(token: ENV["GITHUB_PAT"])
+    if token.nil? || token.empty?
+      puts "Warning: No GitHub token provided. GithubService will not work."
+      @client = nil
+      return
+    end
+
     @client = Octokit::Client.new(access_token: token)
-    if true
+
+    begin
       user = @client.user
       puts "Authenticated as: #{user.login}"
       puts "User ID: #{user.id}"
       puts "Name: #{user.name}"
       puts "Email: #{user.email}"
+    rescue Octokit::Unauthorized
+      puts "Error: GitHub token is invalid or expired. GithubService will not work."
+      @client = nil
     end
-  end
-
-  # Fetch commits in date range
-  def commits_in_range(repo, start_date, stop_date)
-    commits = []
-    page = 1
-
-    loop do
-      batch = @client.commits(
-        repo,
-        per_page: 100,
-        page: page,
-        since: start_date,
-        until: stop_date
-      )
-
-      break if batch.empty?
-
-      commits.concat(batch)
-      page += 1
-    end
-
-    commits
   end
 
   # Filter commits by username

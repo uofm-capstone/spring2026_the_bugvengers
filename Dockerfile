@@ -48,3 +48,7 @@ ENTRYPOINT ["./docker-entry.sh"]
 
 # Let Puma (via config/puma.rb) pick up ENV["PORT"] from Cloud Run
 CMD ["rails", "server", "-b", "0.0.0.0"]
+
+# Ensure Docker file installs all gems
+COPY Gemfile Gemfile.lock ./
+RUN bundle install

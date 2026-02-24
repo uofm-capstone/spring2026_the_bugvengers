@@ -1,0 +1,74 @@
+.app-body:has(.auth-login-fullbleed) .public-content {
+  padding: 0;
+}
+
+.auth-login-fullbleed {
+  min-height: calc(100vh - var(--topbar-height));
+  background-image:
+    linear-gradient(to bottom right, rgba(0, 61, 165, 0.82), rgba(0, 61, 165, 0.52)),
+    url('/assets/login-backdrop.jpg');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+.auth-login-fullbleed__overlay {
+  min-height: calc(100vh - var(--topbar-height));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-6);
+}
+
+.auth-login-card {
+  width: min(520px, 100%);
+  border-radius: var(--radius-lg);
+}
+
+.auth-login-card__title {
+  text-align: center;
+  font-size: var(--text-2xl);
+  margin-bottom: var(--space-4);
+}
+
+.auth-login-card__form .form-group {
+  margin-bottom: var(--space-3);
+}
+
+.auth-login-card__remember {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.auth-login-card__links {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin: var(--space-3) 0 var(--space-4);
+}
+
+.auth-login-card__link {
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.auth-login-card__link:hover {
+  color: var(--color-brand-700);
+}
+
+.auth-login-card__actions {
+  display: flex;
+  justify-content: center;
+}
+
+.auth-login-card__actions .btn {
+  min-width: 140px;
+}
+
+@supports not selector(:has(*)) {
+  .public-content {
+    padding-top: 0;
+  }
+}

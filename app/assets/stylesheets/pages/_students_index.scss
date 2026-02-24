@@ -1,0 +1,20 @@
+.students-index__actions {
+  margin-bottom: var(--space-4);
+}
+
+.students-index__table-card {
+  background: var(--surface-card);
+  border: 1px solid var(--color-gray-200);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.students-index__table-header {
+  padding: var(--space-4);
+  border-bottom: 1px solid var(--color-gray-200);
+}
+
+.students-index__row-actions {
+  display: inline-flex;
+  gap: var(--space-2);
+}

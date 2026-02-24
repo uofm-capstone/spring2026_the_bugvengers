@@ -1,4 +1,21 @@
 module ApplicationHelper
+    def class_names(*args)
+        tokens = args.flat_map do |value|
+            case value
+            when String
+                value.split
+            when Array
+                value
+            when Hash
+                value.filter_map { |class_name, include_name| class_name if include_name }
+            else
+                value.presence
+            end
+        end
+
+        tokens.compact.flat_map { |token| token.to_s.split }.uniq.join(" ")
+    end
+
     # ----------
     # Navigation
     # ----------

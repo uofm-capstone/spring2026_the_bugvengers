@@ -1,0 +1,33 @@
+.teams-index__actions {
+  margin-bottom: var(--space-4);
+}
+
+.teams-index__table-card {
+  background: var(--surface-card);
+  border: 1px solid var(--color-gray-200);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.teams-index__table-header {
+  padding: var(--space-4);
+  border-bottom: 1px solid var(--color-gray-200);
+}
+
+.teams-index__links {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.teams-index__links-row {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-2);
+}
+
+.teams-index__row-actions {
+  display: inline-flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}

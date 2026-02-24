@@ -1,80 +1,22 @@
-<%#
-  Legacy cleanup:
-  This view previously shipped as a standalone HTML document with its own Bootstrap includes.
-  That caused Bootstrap version mismatches (app uses Bootstrap 5) and missing Bootstrap Icons,
-  which can render as placeholder glyphs (e.g., "皿") or empty buttons.
+<%= render "shared/page_header",
+  title: "Admin Dashboard",
+  subtitle: "Manage user access and roles for the current TAG deployment." %>
 
-  We now rely on the application layout for Bootstrap + icons and keep only view-specific styles/markup here.
-%>
+<section class="stat-grid" aria-label="Dashboard summary metrics">
+  <%= render "shared/stat_card", label: "Total Users", value: @dashboard_stats[:total_users] %>
+  <%= render "shared/stat_card", label: "Staff (Admin + TA)", value: @dashboard_stats[:staff_users] %>
+  <%= render "shared/stat_card", label: "Students", value: @dashboard_stats[:students] %>
+  <%= render "shared/stat_card", label: "Semesters", value: @dashboard_stats[:semesters] %>
+</section>
 
-<style>
-    .header {
-      background-color: #f8f9fa;
-      padding: 10px 20px;
-      text-align: center;
-      font-size: 22px;
-      color: #333;
-    }
-    .table th, .table td {
-      vertical-align: middle;
-    }
-    .btn-sm {
-      padding: .25rem .5rem;
-      font-size: .875rem;
-      line-height: 1.5;
-      border-radius: .2rem;
-    }
-    .role-badge {
-      display: inline-block;
-      padding: 0.25em 0.6em;
-      font-size: 75%;
-      font-weight: 700;
-      line-height: 1;
-      text-align: center;
-      white-space: nowrap;
-      vertical-align: baseline;
-      border-radius: 0.25rem;
-      color: white;
-    }
-
-    .role-admin { background-color: #dc3545; }
-    .role-ta { background-color: #fd7e14; }
-    .role-student { background-color: #28a745; }
-    .role-guest { background-color: #6c757d; }
-    
-    .icon-button {
-    color: #6c757d;
-    background: none;
-    border: none;
-    padding: 0;
-    margin: 0;
-    cursor: pointer;
-    text-decoration: none;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.2rem;
-    transition: color 0.2s ease;
-  }
-
-    .icon-button:hover {
-    color: #dc3545;
-  }
-  </style>
-
-  <div class="header">
-    Dashboard
-    <% if current_user.admin? %>
-      <span class="role-badge role-admin">Admin Access</span>
-    <% elsif current_user.ta? %>
-      <span class="role-badge role-ta">TA Access</span>
-    <% end %>
+<section class="admin-dashboard__table-card">
+  <div class="ui-card__body">
+    <h2>User Management</h2>
   </div>
 
-  <div class="container mt-4">
-    <h2>User Management</h2>
-    <table class="table">
-      <thead class='text-center' style='background-color: #0D3182; color: white'>
+  <div class="ui-table-wrap">
+    <table class="table ui-table">
+      <thead class="text-center">
         <tr>
           <th>ID</th>
           <th>Email</th>
@@ -82,44 +24,44 @@
           <th>Actions</th>
         </tr>
       </thead>
-      <tbody class='text-center'>
+      <tbody class="text-center">
         <% @users.each do |user| %>
           <tr>
             <td><%= user.id %></td>
             <td><%= user.email %></td>
+            <td><%= role_badge(user) %></td>
             <td>
-              <%= role_badge(user) %>
-            </td>
-            <td class="d-flex justify-content-center">
-              <% if can? :update, user %>
-                <div class="dropdown mr-2">
-                  <button class="btn btn-sm btn-primary dropdown-toggle" type="button" id="roleDropdown<%= user.id %>" data-bs-toggle="dropdown" aria-expanded="false">
-                    Change Role
-                  </button>
-                  <ul class="dropdown-menu" aria-labelledby="roleDropdown<%= user.id %>">
-                    <% assignable_roles_for(user, current_user).each do |role| %>
-                      <li>
-                        <%= button_to role.titleize, admin_update_role_path(user, role: role), method: :patch, class: "dropdown-item" %>
-                      </li>
-                    <% end %>
-                  </ul>
-                </div>
-              <% end %>
-
-              <% if can? :destroy, user %>
-                <%# Removed legacy empty icon-only label to avoid “blank” action buttons if icon assets fail to load. %>
-                <%= button_to admin_delete_user_path(user),
-                      method: :delete,
-                      data: { confirm: 'Are you sure?' },
-                      class: "icon-button",
-                      form: { class: "d-inline" },
-                      aria: { label: "Delete user #{user.email}" } do %>
-                  <i class="bi bi-trash-fill" aria-hidden="true"></i>
+              <div class="admin-dashboard__actions">
+                <% if can? :update, user %>
+                  <div class="dropdown">
+                    <button class="btn btn-sm btn-ui-primary dropdown-toggle" type="button" id="roleDropdown<%= user.id %>" data-bs-toggle="dropdown" aria-expanded="false">
+                      Change Role
+                    </button>
+                    <ul class="dropdown-menu" aria-labelledby="roleDropdown<%= user.id %>">
+                      <% assignable_roles_for(user, current_user).each do |role| %>
+                        <li>
+                          <%= button_to role.titleize, admin_update_role_path(user, role: role), method: :patch, class: "dropdown-item" %>
+                        </li>
+                      <% end %>
+                    </ul>
+                  </div>
                 <% end %>
-              <% end %>
+
+                <% if can? :destroy, user %>
+                  <%= button_to admin_delete_user_path(user),
+                        method: :delete,
+                        data: { confirm: 'Are you sure?' },
+                        class: "icon-button",
+                        form: { class: "d-inline" },
+                        aria: { label: "Delete user #{user.email}" } do %>
+                    <i class="bi bi-trash-fill" aria-hidden="true"></i>
+                  <% end %>
+                <% end %>
+              </div>
             </td>
           </tr>
         <% end %>
       </tbody>
     </table>
   </div>
+</section>

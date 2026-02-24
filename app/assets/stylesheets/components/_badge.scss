@@ -1,0 +1,18 @@
+.ui-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  padding: 0.15rem 0.55rem;
+}
+
+.role-badge {
+  @extend .ui-badge;
+  color: #fff;
+}
+
+.role-admin { background-color: #dc2626; }
+.role-ta { background-color: #d97706; }
+.role-student { background-color: #16a34a; }
+.role-guest { background-color: #64748b; }

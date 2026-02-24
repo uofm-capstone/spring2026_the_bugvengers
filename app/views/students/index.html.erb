@@ -103,28 +103,15 @@
 
               <td class="align-middle text-center" style="max-width=440px;">
                 <div class="d-flex justify-content-center gap-2">
-                  <%= link_to 'Email',
-                    (student.email.present? ? "mailto:#{student.email}" : "#"),
-                    class: class_names(
-                      "btn btn-outline-secondary btn-sm link-button",
-                      "missing" => student.email.blank?,
-                      "available" => student.email.present?
-                    ) %>
-
-                  <%= link_to 'GitHub',
-                    (student.github_username.present? ? "https://github.com/#{student.github_username}" : "#"),
-                    class: class_names(
-                      "btn btn-outline-secondary btn-sm link-button",
-                      "missing" => student.github_username.blank?,
-                      "available" => student.github_username.present?
-                    ),
-                    target: (student.github_username.present? ? "_blank" : nil),
-                    rel: "noopener" %>
+                  <%# Legacy cleanup: avoid rendering dead `href="#"` placeholder links. %>
+                  <%= student_contact_button(student, :email) %>
+                  <%= student_contact_button(student, :github) %>
                 </div>
               </td>
 
               <td class="align-middle text-center">
-                <% if !defined?(can?) || can?(:modify, student) %>
+                <%# Legacy cleanup: keep authorization rules unchanged; just centralize the view predicate. %>
+                <% if can_modify_student_row?(student) %>
                   <%= link_to edit_student_path(student), class: "icon-button", title: "Edit" do %>
                     <i class="bi bi-pen-fill"></i>
                   <% end %>

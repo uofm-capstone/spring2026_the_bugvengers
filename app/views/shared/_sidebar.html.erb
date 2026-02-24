@@ -1,21 +1,10 @@
-<div class="sidebar bg-light p-4 shadow-sm" style="height: 100vh; width: 250px; position: fixed;">
-  <h4 class="fw-bold mb-4">Navigation</h4>
-  <ul class="nav flex-column">
-    <li class="nav-item mb-3">
-      <%= link_to "Semesters", semesters_path, class: "nav-link text-dark fs-5" %>
-    </li>
-    <li class="nav-item mb-3">
-      <%= link_to "Teams", teams_path, class: "nav-link text-dark fs-5" %>
-    </li>
-    <li class="nav-item mb-3">
-      <%= link_to "Students", students_path, class: "nav-link text-dark fs-5" %>
-    </li>
-    <li class="nav-item mb-3">
-      <% if session[:last_viewed_semester_id] %>
-        <%= link_to "Status Page", semester_status_path(session[:last_viewed_semester_id]), class: "nav-link text-dark fs-5" %>
-      <% else %>
-        <%= link_to "Status Page", semesters_path, class: "nav-link text-dark fs-5" %>
-      <% end %>
-    </li>
-  </ul>
-</div>
+<aside class="sidebar bg-light p-4 shadow-sm" style="height: 100vh; width: 250px; position: fixed;">
+  <div class="fw-bold mb-4">Navigation</div>
+
+  <nav class="nav nav-pills flex-column gap-1">
+    <%= nav_link_to "Semesters", semesters_path, class: "fs-5 link-dark", active_when: { controller: "semesters" } %>
+    <%= nav_link_to "Teams", teams_path, class: "fs-5 link-dark", active_when: { controller: "teams" } %>
+    <%= nav_link_to "Students", students_path, class: "fs-5 link-dark", active_when: { controller: "students" } %>
+    <%= nav_link_to "Status", status_page_path, class: "fs-5 link-dark", active_when: { controller: "semesters", action: "status" } %>
+  </nav>
+</aside>

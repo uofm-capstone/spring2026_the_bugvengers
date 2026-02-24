@@ -1,9 +1,13 @@
-<!DOCTYPE html>
-<html>
-<head>
-  <title>Dashboard</title>
-  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
-  <style>
+<%#
+  Legacy cleanup:
+  This view previously shipped as a standalone HTML document with its own Bootstrap includes.
+  That caused Bootstrap version mismatches (app uses Bootstrap 5) and missing Bootstrap Icons,
+  which can render as placeholder glyphs (e.g., "皿") or empty buttons.
+
+  We now rely on the application layout for Bootstrap + icons and keep only view-specific styles/markup here.
+%>
+
+<style>
     .header {
       background-color: #f8f9fa;
       padding: 10px 20px;
@@ -58,8 +62,6 @@
   }
   </style>
 
-</head>
-<body>
   <div class="header">
     Dashboard
     <% if current_user.admin? %>
@@ -105,7 +107,15 @@
               <% end %>
 
               <% if can? :destroy, user %>
-                <%= button_to "", admin_delete_user_path(user), method: :delete, data: { confirm: 'Are you sure?' }, class: "icon-button btn bi bi-trash-fill" %>
+                <%# Removed legacy empty icon-only label to avoid “blank” action buttons if icon assets fail to load. %>
+                <%= button_to admin_delete_user_path(user),
+                      method: :delete,
+                      data: { confirm: 'Are you sure?' },
+                      class: "icon-button",
+                      form: { class: "d-inline" },
+                      aria: { label: "Delete user #{user.email}" } do %>
+                  <i class="bi bi-trash-fill" aria-hidden="true"></i>
+                <% end %>
               <% end %>
             </td>
           </tr>
@@ -113,5 +123,3 @@
       </tbody>
     </table>
   </div>
-</body>
-</html>

@@ -110,32 +110,36 @@
     </div>
     <div class="col-9">
       <div class="d-flex justify-content-center">
-        <button class="btn btn-outline btn-primary w-100 expand-all-flag d-flex justify-content-between align-items-center" type="button" data-toggle="collapse" data-target="#collapsibleContent" aria-expanded="false" style="padding: 5px 10px; font-size: 12px;">
-            Attention
-            <span class="icon"></span>
-        </button>
-      </div>
-      <div class="collapse multi-collapse" id="collapsibleContent">
-        <% if @cliSurvey.blank? %>
-          <div class="card w-100 border-danger">
-            <div class="card-body bg-danger text-white">
-              <p class="card-text text-center">
-                  <strong>Attention:</strong> Client survey response is not available. Please check if the client has submitted their survey or confirm there are no issues with the CSV file.
-              </p>
-              <%= puts @access_tokens["TAG"] %> <!-- DEBUG LINE -->
-
-            </div>
-          </div>
-        <% else %>
-          <div class="card w-100 border-success">
-            <div class="card-body bg-success text-white">
-              <p class="card-text text-center">
-                  The data on this page is all good.
-              </p>
-            </div>
-          </div>
+        <%# Legacy cleanup: data-quality warnings are staff-only; students can't action these and they create noise. %>
+        <% if staff_user? %>
+          <button class="btn btn-outline btn-primary w-100 expand-all-flag d-flex justify-content-between align-items-center" type="button" data-toggle="collapse" data-target="#collapsibleContent" aria-expanded="false" style="padding: 5px 10px; font-size: 12px;">
+              Attention
+              <span class="icon"></span>
+          </button>
         <% end %>
       </div>
+      <% if staff_user? %>
+        <div class="collapse multi-collapse" id="collapsibleContent">
+          <% if @cliSurvey.blank? %>
+            <div class="card w-100 border-danger">
+              <div class="card-body bg-danger text-white">
+                <p class="card-text text-center">
+                    <strong>Attention:</strong> Client survey response is not available. Please check if the client has submitted their survey or confirm there are no issues with the CSV file.
+                </p>
+                <%# Removed legacy debug output that leaked internal token data into the rendered page. %>
+              </div>
+            </div>
+          <% else %>
+            <div class="card w-100 border-success">
+              <div class="card-body bg-success text-white">
+                <p class="card-text text-center">
+                    The data on this page is all good.
+                </p>
+              </div>
+            </div>
+          <% end %>
+        </div>
+      <% end %>
       
       <div class="rounded border p-3 bg-light">
         <% unless @flags.include?("student blank") %>
@@ -194,17 +198,15 @@
 
         <%# Then, check if any expected key is missing in the survey response %>
         <% missing_responses = expected_keys.any? { |key| !@cliSurvey[0].has_key?(key) } %>
-        <% Rails.logger.debug "Missing responses: #{missing_responses}" %>
 
         <%# Collect the keys of the missing responses %>
         <% missing_keys = expected_keys.reject { |key| @cliSurvey[0].has_key?(key) } %>
-        <% Rails.logger.debug "Missing responses: #{missing_keys.any?}" %>
 
         <!-- If there's survey data, it should display in this section -->
         <h2 id="client-scores">Client Scores</h2>
 
         <%# Display a message if missing responses are detected %>
-        <% if missing_responses %>
+        <% if staff_user? && missing_responses %>
             <div class="d-flex justify-content-center mt-4 mb-4">
               <div class="card w-50 border-danger">
                 <div class="card-body bg-danger text-white">
@@ -215,12 +217,10 @@
               </div>
             </div>
         <% end %>
-        <%Rails.logger.debug "missing_responses : #{missing_responses}"%>
         
 
         <table class="table">
           <%# Debug the structure of @cliSurvey[0] to ensure it's as expected %>
-            <% Rails.logger.debug "@cliSurvey[0]: #{@cliSurvey[0]}" %>
             <%# Iterate over the full questions %>
             <% @full_questions.each do |code, full_question| %>
               <%# Convert the code to a lowercase symbol before checking %>
@@ -228,7 +228,6 @@
               <% if @cliSurvey[0].has_key?(sym_code) %>
                 <%# Access the response using the symbolized and lowercased code %>
                 <% response = @cliSurvey[0][sym_code] %>
-                <% Rails.logger.debug "Response for #{sym_code}: #{response}" %>
                 <tr>
                   <th><%= full_question %></th>
                   <td class="<%= 'text-white bg-danger' if response.blank? || !['exceeded expectations', 'met expectations'].include?(response.strip.downcase) %>">
@@ -236,7 +235,7 @@
                   </td>
                 </tr>
               <% else %>
-                <% Rails.logger.debug "No response found for #{sym_code}" %>
+                <%# Legacy cleanup: remove view-level debug logging; missing keys are handled via flags/warnings above. %>
               <% end %>
             <% end %>
             <tr>
@@ -362,8 +361,8 @@
            <form id="github-form">
            <h1 id="github-commits" style="font-size: 2rem; margin-top: 0.5rem; margin-bottom: 0.5rem;">Github Commits</h1>
 
-           <% if @semester.git_csv.attached? %>
-             <!-- Keep the warning if you still want it -->
+           <% if staff_user? && @semester.git_csv.attached? %>
+             <%# Legacy cleanup: this notice is only relevant to staff managing CSV/API ingestion. %>
              <div class="d-flex justify-content-center mt-4 mb-4">
                <div class="card w-100 border-danger">
                  <div class="card-body bg-danger text-white">

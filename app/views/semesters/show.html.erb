@@ -147,6 +147,28 @@
       z-index: 6;
     }
 
+    /* Prevent sticky content from visually covering other columns */
+    .team-status-table th.sticky-col-1,
+    .team-status-table td.sticky-col-1,
+    .team-status-table th.sticky-col-2,
+    .team-status-table td.sticky-col-2 {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    /* On very small screens, sticky columns can become intrusive; disable stickiness */
+    @media (max-width: 576px) {
+      .team-status-table th.sticky-col-1,
+      .team-status-table td.sticky-col-1,
+      .team-status-table th.sticky-col-2,
+      .team-status-table td.sticky-col-2 {
+        position: static;
+        left: auto;
+        z-index: auto;
+      }
+    }
+
     /* Sprint buttons */
     .sprint-toggle.active {
       background-color: var(--bs-primary);

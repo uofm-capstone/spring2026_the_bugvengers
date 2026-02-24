@@ -1,0 +1,38 @@
+.semesters-show {
+  overflow-x: hidden;
+}
+
+.semesters-show .main-content {
+  flex: 1;
+  border: 2px solid #ffffff;
+  border-radius: 10px;
+  padding: 20px;
+  min-width: 0;
+  overflow-y: visible;
+  overflow-x: hidden;
+  background: #fff;
+}
+
+.semesters-show .table-responsive {
+  display: block;
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  margin-bottom: 20px;
+  padding-right: 40px;
+  position: relative;
+}
+
+.semesters-show .tooltip-inner {
+  max-width: 250px;
+  font-size: 0.85rem;
+  line-height: 1.4;
+  text-align: left;
+  padding: 8px 10px;
+}
+
+.semesters-show .sprint-toggle.active {
+  background-color: var(--bs-primary);
+  color: var(--bs-white);
+}

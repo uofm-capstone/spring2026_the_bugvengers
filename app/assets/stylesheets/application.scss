@@ -29,8 +29,17 @@
 @import "components/stat-card";
 @import "components/data-table";
 @import "components/flash";
+@import "components/link-status";
 @import "components/page-header";
 @import "pages/admin_dashboard";
+@import "pages/students_index";
+@import "pages/teams_index";
+@import "pages/semesters_home";
+@import "pages/semesters_status";
+@import "pages/semesters_classlist";
+@import "pages/semesters_show";
+@import "pages/auth_edit";
+@import "pages/auth_login";
 
 body {
   padding-top: 0;

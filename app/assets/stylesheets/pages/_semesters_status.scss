@@ -1,0 +1,13 @@
+.semesters-status__list {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.semesters-status__item {
+  border-radius: var(--radius-lg);
+}
+
+.semesters-status__title {
+  font-size: var(--text-lg);
+  margin-bottom: var(--space-3);
+}

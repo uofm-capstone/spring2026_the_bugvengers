@@ -1,0 +1,62 @@
+.semesters-home__actions {
+  margin-bottom: var(--space-4);
+}
+
+.semesters-home__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: var(--space-4);
+}
+
+.semesters-home__year-card {
+  border-radius: var(--radius-lg);
+}
+
+.semesters-home__year-title {
+  margin-bottom: var(--space-3);
+}
+
+.semesters-home__term-list {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.semesters-home__term-card {
+  border: 1px solid var(--color-gray-200);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  background: #fff;
+}
+
+.semesters-home__term-card--selected {
+  border-color: var(--color-brand-700);
+  box-shadow: 0 0 0 1px var(--color-brand-700) inset;
+}
+
+.semesters-home__term-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+.semesters-home__term-header h3 {
+  font-size: var(--text-base);
+  font-weight: 600;
+}
+
+.semesters-home__term-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.semesters-home__optional {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.semesters-home__optional-header {
+  margin: 0;
+}

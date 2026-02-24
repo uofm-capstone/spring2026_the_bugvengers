@@ -19,7 +19,7 @@
     <%= javascript_include_tag 'application', 'data-turbolinks-track': 'reload', type: 'module' %>
   </head>
 
-  <body class="app-body">
+  <body class="app-body <%= 'auth-login-page' if controller_path == 'devise/sessions' && action_name == 'new' %>">
     <%= turbo_frame_tag "modal" %>
 
     <% if user_signed_in? %>

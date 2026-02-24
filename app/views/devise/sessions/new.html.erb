@@ -1,46 +1,39 @@
-<section class="vh-100" style="background: 
-    linear-gradient(to bottom right, rgba(0, 61, 165, 0.8), rgba(0, 61, 165, 0.5)), 
-    url('<%= asset_path('login-backdrop.jpg') %>'); 
-    background-size: cover; background-position: center;">
-  <div class="mask d-flex align-items-center h-100">
-    <div class="container h-100">
-      <div class="row d-flex justify-content-center align-items-center h-100">
-        <div class="col-12 col-md-9 col-lg-7 col-xl-6">
-          <div class="card shadow-lg" style="border-radius: 20px;">
-            <div class="card-body p-5">
-              <h2 class="text-uppercase text-center mb-4 font-weight-bold">Welcome Back</h2>
+<section class="auth-login-fullbleed">
+  <div class="auth-login-fullbleed__overlay">
+    <article class="auth-login-card ui-card">
+      <div class="ui-card__body">
+        <h1 class="auth-login-card__title">Welcome Back</h1>
 
-              <%= bootstrap_form_for(resource, as: resource_name, url: session_path(resource_name)) do |f| %>
-                <div class="form-outline mb-4">
-                  <%= f.email_field :email, autofocus: true, autocomplete: "email", class: "form-control form-control-lg border border-primary", id: "form3Example3cg", placeholder: "Email Address", aria: { describedby: "emailHelp" } %>
-                </div>
+        <%= bootstrap_form_for(resource, as: resource_name, url: session_path(resource_name), html: { class: "auth-login-card__form" }) do |f| %>
+          <%= f.email_field :email,
+            autofocus: true,
+            autocomplete: "email",
+            label: "Email",
+            placeholder: "Email Address" %>
 
-                <div class="form-outline mb-4">
-                  <%= f.password_field :password, autocomplete: "current-password", class: "form-control form-control-lg border border-primary", id: "form3Example4cg", placeholder: "Password", aria: { describedby: "passwordHelp" } %>
-                </div>
+          <%= f.password_field :password,
+            autocomplete: "current-password",
+            label: "Password",
+            placeholder: "Password" %>
 
-                <% if devise_mapping.rememberable? %>
-                  <div class="form-check form-switch mb-4">
-                    <%= f.check_box :remember_me, class: "form-check-input", id: "rememberMe", style: "cursor: pointer;" %>
-                    <label class="form-check-label" for="rememberMe"></label>
-                  </div>
-                <% end %>
-
-                <div class="d-flex justify-content-between mb-3">
-                  <%= link_to "Forgot Password?", new_password_path(resource_name), class: "text-body fw-bold" %>
-                  <% if devise_mapping.registerable? && controller_name != 'registrations' %>
-                    <%= link_to "Sign Up", new_registration_path(resource_name), class: "text-body fw-bold" %>
-                  <% end %>
-                </div>
-
-                <div class="d-flex justify-content-center mb-4">
-                  <%= f.submit "Log In", class: "btn btn-primary btn-block btn-lg rounded-pill shadow" %>
-                </div>
-              <% end %>
+          <% if devise_mapping.rememberable? %>
+            <div class="auth-login-card__remember form-check mb-3">
+              <%= f.check_box :remember_me, class: "form-check-input", id: "rememberMe" %>
             </div>
+          <% end %>
+
+          <div class="auth-login-card__links">
+            <%= link_to "Forgot Password?", new_password_path(resource_name), class: "auth-login-card__link" %>
+            <% if devise_mapping.registerable? && controller_name != 'registrations' %>
+              <%= link_to "Sign Up", new_registration_path(resource_name), class: "auth-login-card__link" %>
+            <% end %>
           </div>
-        </div>
+
+          <div class="auth-login-card__actions">
+            <%= f.submit "Log In", class: "btn btn-ui-primary" %>
+          </div>
+        <% end %>
       </div>
-    </div>
+    </article>
   </div>
 </section>

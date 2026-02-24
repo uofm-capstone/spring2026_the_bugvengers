@@ -4,7 +4,8 @@
 }
 
 .auth-edit__card {
-  width: min(760px, 100%);
+  width: 100%;
+  max-width: 760px;
 }
 
 .auth-edit__form .form-group {

@@ -21,7 +21,8 @@
 }
 
 .auth-login-card {
-  width: min(520px, 100%);
+  width: 100%;
+  max-width: 520px;
   border-radius: var(--radius-lg);
 }
 

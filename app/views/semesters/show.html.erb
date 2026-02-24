@@ -129,7 +129,7 @@
     .team-status-table thead th {
       position: sticky;
       top: 0;
-      background: var(--bs-tertiary-bg);
+      background-color: var(--bs-light, #f8f9fa);
       z-index: 5;
     }
 
@@ -137,26 +137,36 @@
     .team-status-table td.sticky-col-1 {
       position: sticky;
       left: 0;
-      background: var(--bs-body-bg);
+      width: var(--sticky-col-1-width);
+      background-color: var(--bs-body-bg, #ffffff);
       background-clip: padding-box;
       z-index: 40;
+      -webkit-transform: translateZ(0);
+      transform: translateZ(0);
+      -webkit-backface-visibility: hidden;
+      backface-visibility: hidden;
     }
 
     .team-status-table th.sticky-col-2,
     .team-status-table td.sticky-col-2 {
       position: sticky;
       left: var(--sticky-col-1-width);
-      background: var(--bs-body-bg);
+      width: var(--sticky-col-2-width);
+      background-color: var(--bs-body-bg, #ffffff);
       background-clip: padding-box;
       z-index: 40;
       box-shadow: 1px 0 0 var(--bs-border-color);
+      -webkit-transform: translateZ(0);
+      transform: translateZ(0);
+      -webkit-backface-visibility: hidden;
+      backface-visibility: hidden;
     }
 
     /* Make sure the top-left header cells win all overlaps */
     .team-status-table thead th.sticky-col-1,
     .team-status-table thead th.sticky-col-2 {
       z-index: 60;
-      background: var(--bs-tertiary-bg);
+      background-color: var(--bs-light, #f8f9fa);
     }
 
     /* Body sticky cells should still stay above scrolling cells */

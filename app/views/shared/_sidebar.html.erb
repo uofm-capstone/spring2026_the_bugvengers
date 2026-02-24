@@ -1,10 +1,21 @@
-<aside class="sidebar bg-light p-4 shadow-sm" style="height: 100vh; width: 250px; position: fixed;">
-  <div class="fw-bold mb-4">Navigation</div>
+<aside class="app-sidebar" aria-label="Primary navigation">
+  <div class="app-sidebar__header">Navigation</div>
 
-  <nav class="nav nav-pills flex-column gap-1">
-    <%= nav_link_to "Semesters", semesters_path, class: "fs-5 link-dark", active_when: -> { controller_name == "semesters" && action_name != "status" } %>
-    <%= nav_link_to "Teams", teams_path, class: "fs-5 link-dark", active_when: { controller: "teams" } %>
-    <%= nav_link_to "Students", students_path, class: "fs-5 link-dark", active_when: { controller: "students" } %>
-    <%= nav_link_to "Status", status_page_path, class: "fs-5 link-dark", active_when: { controller: "semesters", action: "status" } %>
+  <nav class="app-sidebar__group" aria-label="Main sections">
+    <%= nav_link_to "Semesters", semesters_path, class: "app-sidebar__link", active_when: -> { controller_name == "semesters" && action_name != "status" } do %>
+      <i class="bi bi-calendar3 me-2" aria-hidden="true"></i> Semesters
+    <% end %>
+
+    <%= nav_link_to "Teams", teams_path, class: "app-sidebar__link", active_when: { controller: "teams" } do %>
+      <i class="bi bi-people me-2" aria-hidden="true"></i> Teams
+    <% end %>
+
+    <%= nav_link_to "Students", students_path, class: "app-sidebar__link", active_when: { controller: "students" } do %>
+      <i class="bi bi-mortarboard me-2" aria-hidden="true"></i> Students
+    <% end %>
+
+    <%= nav_link_to "Status", status_page_path, class: "app-sidebar__link", active_when: { controller: "semesters", action: "status" } do %>
+      <i class="bi bi-bar-chart me-2" aria-hidden="true"></i> Status
+    <% end %>
   </nav>
 </aside>

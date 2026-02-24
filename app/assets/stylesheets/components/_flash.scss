@@ -1,0 +1,9 @@
+.flash-stack {
+  padding: var(--space-3) var(--space-4) 0;
+}
+
+.flash-stack .alert {
+  max-width: 720px;
+  margin: 0 auto var(--space-2);
+  box-shadow: var(--shadow-sm);
+}

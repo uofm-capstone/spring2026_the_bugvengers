@@ -1,0 +1,14 @@
+<div class="page-header">
+  <div>
+    <h1><%= title %></h1>
+    <% if local_assigns[:subtitle].present? %>
+      <p class="page-header__meta"><%= subtitle %></p>
+    <% end %>
+  </div>
+
+  <% if local_assigns[:actions].present? %>
+    <div>
+      <%= actions %>
+    </div>
+  <% end %>
+</div>

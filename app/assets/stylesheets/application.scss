@@ -17,8 +17,23 @@
 //@import "bootstrap";
 //@import "bootstrap_forms";
 
+@import "base/tokens";
+@import "base/reset";
+@import "base/typography";
+@import "layout/shell";
+@import "layout/topbar";
+@import "layout/sidebar";
+@import "components/card";
+@import "components/badge";
+@import "components/btn";
+@import "components/stat-card";
+@import "components/data-table";
+@import "components/flash";
+@import "components/page-header";
+@import "pages/admin_dashboard";
+
 body {
-    padding-top: 4rem;
+  padding-top: 0;
   }
 .starter-template {
     padding: 3rem 1.5rem;

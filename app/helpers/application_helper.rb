@@ -7,7 +7,7 @@ module ApplicationHelper
     # Examples:
     #   nav_link_to("Semesters", semesters_path, active_when: { controller: "semesters" })
     #   nav_link_to("Status", status_page_path, active_when: { controller: "semesters", action: "status" })
-    def nav_link_to(label, path, active_when: nil, **options)
+    def nav_link_to(label, path, active_when: nil, **options, &block)
         is_active = nav_active?(path, active_when: active_when)
 
         existing_classes = options[:class].to_s.split
@@ -24,7 +24,11 @@ module ApplicationHelper
 
         options["aria-current"] = "page" if is_active
 
-        link_to(label, path, options)
+        if block_given?
+            link_to(path, options, &block)
+        else
+            link_to(label, path, options)
+        end
     end
 
     # Backwards-compatible alias (was previously unused, but safe to keep).

@@ -1,6 +1,6 @@
 <% if controller_name == 'semesters' && action_name == 'team' %>
-  <li class="nav-item dropdown">
-    <a class="nav-link dropdown-toggle" href="#" id="teamDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+  <div class="dropdown topbar-inline-dropdown">
+    <a class="topbar__link dropdown-toggle" href="#" id="teamDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
       <%= @team %>
     </a>
     <ul class="dropdown-menu" aria-labelledby="teamDropdown">
@@ -11,10 +11,10 @@
       <% end %>
 
     </ul>
-  </li>
+  </div>
 
-  <li class="nav-item dropdown">
-    <a class="nav-link dropdown-toggle" href="#" id="sprintDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+  <div class="dropdown topbar-inline-dropdown">
+    <a class="topbar__link dropdown-toggle" href="#" id="sprintDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
       <%= @sprint %>
     </a>
     <ul class="dropdown-menu" aria-labelledby="sprintDropdown">
@@ -25,5 +25,5 @@
       <% end %>
 
     </ul>
-  </li>
+  </div>
 <% end %>

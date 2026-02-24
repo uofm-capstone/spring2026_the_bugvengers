@@ -7,6 +7,12 @@ class AdminController < ApplicationController
   def dashboard
     @semesters = Semester.all
     @users = User.all.order(:email)
+    @dashboard_stats = {
+      total_users: @users.size,
+      staff_users: @users.count { |user| user.admin? || user.ta? },
+      students: @users.count(&:student?),
+      semesters: @semesters.size
+    }
   end
 
   def check_ta_or_admin

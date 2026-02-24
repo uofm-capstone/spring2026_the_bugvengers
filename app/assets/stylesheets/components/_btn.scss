@@ -1,0 +1,12 @@
+.btn-ui-primary {
+  background: var(--color-brand-700);
+  color: #fff;
+  border: 1px solid var(--color-brand-700);
+}
+
+.btn-ui-primary:hover,
+.btn-ui-primary:focus {
+  background: var(--color-brand-900);
+  border-color: var(--color-brand-900);
+  color: #fff;
+}

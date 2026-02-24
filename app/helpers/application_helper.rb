@@ -69,4 +69,21 @@ module ApplicationHelper
         # Render a link with data attributes for the new instance
         link_to(name, '#', class: "add_fields btn btn-secondary", data: { id: id, fields: fields.gsub("\n", "") })
     end
+
+    # UI-only convenience helpers
+    # -------------------------
+    # These are intentionally NOT authorization rules. They only help views decide what to render.
+    # We avoid changing controller/model authorization logic per sponsor-ready refactor constraints.
+
+    def staff_user?(user = current_user)
+        user.present? && (user.admin? || user.ta?)
+    end
+
+    # Safe wrapper around CanCan's `can?` for views that may be rendered without CanCan available.
+    # Preserves legacy behavior: if `can?` isn't present, we default to showing the UI.
+    def ui_can?(action, subject)
+        return true unless respond_to?(:can?)
+
+        can?(action, subject)
+    end
 end

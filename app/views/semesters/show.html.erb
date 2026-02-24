@@ -326,12 +326,16 @@
                         <tr>
                           <% if i == 0 %>
                             <td class="sticky-col-1" rowspan="<%= team.students.size %>">
-                              <%= link_to team.name, teams_path(@semester), class: "text-decoration-none fw-semibold" %>
+                              <div class="sticky-cell">
+                                <%= link_to team.name, teams_path(@semester), class: "text-decoration-none fw-semibold" %>
+                              </div>
                             </td>
                           <% end %>
 
-                          <td class="sticky-col-2" style="white-space: nowrap;">
-                            <%= "#{student.name.split.first} #{student.name.split.last&.first}." %>
+                          <td class="sticky-col-2">
+                            <div class="sticky-cell">
+                              <%= "#{student.name.split.first} #{student.name.split.last&.first}." %>
+                            </div>
                           </td>
 
                           <% @sprint_list.each do |sprint| %>

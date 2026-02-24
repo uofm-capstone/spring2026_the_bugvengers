@@ -135,11 +135,32 @@
     z-index: 6;
 }
 
+/* Ensure long names never paint over other columns */
+.team-status-table .sticky-cell {
+    display: block;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 @media (max-width: 768px) {
     .team-status-table {
         --sticky-col-1-width: 140px;
         --sticky-col-2-width: 120px;
         font-size: 0.78rem;
+    }
+
+    /* Sticky columns are helpful on desktop, but can overlap on small widths.
+         Disable stickiness at <=768px to keep the grid readable. */
+    .team-status-table th.sticky-col-1,
+    .team-status-table td.sticky-col-1,
+    .team-status-table th.sticky-col-2,
+    .team-status-table td.sticky-col-2 {
+        position: static;
+        left: auto;
+        z-index: auto;
+        background: inherit;
     }
 
     .team-status-table th,

@@ -1,4 +1,4 @@
-.app-body:has(.auth-login-fullbleed) .public-content {
+.app-body.auth-login-page .public-content {
   padding: 0;
 }
 
@@ -65,10 +65,4 @@
 
 .auth-login-card__actions .btn {
   min-width: 140px;
-}
-
-@supports not selector(:has(*)) {
-  .public-content {
-    padding-top: 0;
-  }
 }

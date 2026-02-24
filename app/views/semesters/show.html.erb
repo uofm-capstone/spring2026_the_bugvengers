@@ -336,23 +336,33 @@
                                     <% end %>
                                   <% when "PP" %>
                                     <!-- Product Progress — Metric: Cards moved through workflow (To-Do → In-Progress → Done) per team member -->
-                                    <%= image_tag "check-circle-fill.svg", style: "height:16px" %>
+                                    <span class="ui-tooltip" tabindex="0" aria-label="OK" data-tooltip="OK">
+                                      <%= image_tag "check-circle-fill.svg", class: "team-status-icon", alt: "", aria: { hidden: true } %>
+                                    </span>
 
                                   <% when "CBP" %>
                                     <!-- Coding Best Practices — Metric: Count of commits and lines of code changed per team member -->
-                                    <%= image_tag "check-circle-fill.svg", style: "height:16px" %>
+                                    <span class="ui-tooltip" tabindex="0" aria-label="OK" data-tooltip="OK">
+                                      <%= image_tag "check-circle-fill.svg", class: "team-status-icon", alt: "", aria: { hidden: true } %>
+                                    </span>
 
                                   <% when "TSP" %>
                                     <!-- Time Spent Since Progress Check — Metric: Sum of work hours or task updates since last progress check -->
-                                    <%= image_tag "check-circle-fill.svg", style: "height:16px" %>
+                                    <span class="ui-tooltip" tabindex="0" aria-label="OK" data-tooltip="OK">
+                                      <%= image_tag "check-circle-fill.svg", class: "team-status-icon", alt: "", aria: { hidden: true } %>
+                                    </span>
 
                                   <% when "KU", "TS", "CC", "SR", "PF", "D" %>
                                     <!-- N/A metrics — Metric: Not applicable (no direct data collected) -->
-                                    <%= image_tag "question-circle-fill.svg", style: "height:16px" %>
+                                    <span class="ui-tooltip" tabindex="0" aria-label="No data / N/A" data-tooltip="No data / N/A">
+                                      <%= image_tag "question-circle-fill.svg", class: "team-status-icon", alt: "", aria: { hidden: true } %>
+                                    </span>
 
                                   <% else %>
                                     <!-- Unknown rubric type — Metric: Description unavailable -->
-                                    <%= image_tag "question-circle-fill.svg", style: "height:16px" %>
+                                    <span class="ui-tooltip" tabindex="0" aria-label="No data / N/A" data-tooltip="No data / N/A">
+                                      <%= image_tag "question-circle-fill.svg", class: "team-status-icon", alt: "", aria: { hidden: true } %>
+                                    </span>
                                 <% end %>
                               </td>
                             <% end %>

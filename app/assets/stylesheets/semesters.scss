@@ -98,6 +98,8 @@
 /* Big sprint status grid: keep it scrollable and readable. */
 .team-status-table-wrap {
     -webkit-overflow-scrolling: touch;
+    position: relative;
+    isolation: isolate;
 }
 
 .team-status-table {
@@ -107,6 +109,7 @@
     border-spacing: 0;
     white-space: nowrap;
 }
+    position: relative;
 
 .team-status-table thead th {
     position: sticky;
@@ -126,8 +129,9 @@
     left: 0;
     min-width: var(--sticky-col-1-width);
     max-width: var(--sticky-col-1-width);
-    background: var(--bs-tertiary-bg);
-    z-index: 15;
+    background: var(--bs-body-bg);
+    background-clip: padding-box;
+    z-index: 40;
 }
 
 .team-status-table th.sticky-col-2,
@@ -136,19 +140,21 @@
     left: var(--sticky-col-1-width);
     min-width: var(--sticky-col-2-width);
     max-width: var(--sticky-col-2-width);
-    background: var(--bs-tertiary-bg);
-    z-index: 15;
+    background: var(--bs-body-bg);
+    background-clip: padding-box;
+    z-index: 40;
     box-shadow: 1px 0 0 var(--bs-border-color);
 }
 
 .team-status-table tbody td.sticky-col-1,
 .team-status-table tbody td.sticky-col-2 {
-    z-index: 20;
+    z-index: 60;
+    background: var(--bs-tertiary-bg);
 }
 
 /* Ensure long names never paint over other columns */
 .team-status-table .sticky-cell {
-    display: block;
+    z-index: 50;
     max-width: 100%;
     overflow: hidden;
     text-overflow: ellipsis;

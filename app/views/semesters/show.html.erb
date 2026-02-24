@@ -137,29 +137,32 @@
     .team-status-table td.sticky-col-1 {
       position: sticky;
       left: 0;
-      background: var(--bs-tertiary-bg);
-      z-index: 15;
+      background: var(--bs-body-bg);
+      background-clip: padding-box;
+      z-index: 40;
     }
 
     .team-status-table th.sticky-col-2,
     .team-status-table td.sticky-col-2 {
       position: sticky;
       left: var(--sticky-col-1-width);
-      background: var(--bs-tertiary-bg);
-      z-index: 15;
+      background: var(--bs-body-bg);
+      background-clip: padding-box;
+      z-index: 40;
       box-shadow: 1px 0 0 var(--bs-border-color);
     }
 
     /* Make sure the top-left header cells win all overlaps */
     .team-status-table thead th.sticky-col-1,
     .team-status-table thead th.sticky-col-2 {
-      z-index: 30;
+      z-index: 60;
+      background: var(--bs-tertiary-bg);
     }
 
     /* Body sticky cells should still stay above scrolling cells */
     .team-status-table tbody td.sticky-col-1,
     .team-status-table tbody td.sticky-col-2 {
-      z-index: 20;
+      z-index: 50;
     }
 
     /* Prevent sticky content from visually covering other columns */

@@ -119,6 +119,8 @@
     }
 
     .team-status-table {
+      --sticky-col-1-width: 160px;
+      --sticky-col-2-width: 140px;
       border-collapse: separate;
       border-spacing: 0;
       white-space: nowrap;
@@ -136,7 +138,7 @@
       position: sticky;
       left: 0;
       background: var(--bs-tertiary-bg);
-      z-index: 6; /* higher so it stays above scrolling cells */
+      z-index: 15;
     }
 
     .team-status-table th.sticky-col-2,
@@ -144,7 +146,20 @@
       position: sticky;
       left: var(--sticky-col-1-width);
       background: var(--bs-tertiary-bg);
-      z-index: 6;
+      z-index: 15;
+      box-shadow: 1px 0 0 var(--bs-border-color);
+    }
+
+    /* Make sure the top-left header cells win all overlaps */
+    .team-status-table thead th.sticky-col-1,
+    .team-status-table thead th.sticky-col-2 {
+      z-index: 30;
+    }
+
+    /* Body sticky cells should still stay above scrolling cells */
+    .team-status-table tbody td.sticky-col-1,
+    .team-status-table tbody td.sticky-col-2 {
+      z-index: 20;
     }
 
     /* Prevent sticky content from visually covering other columns */
@@ -157,8 +172,8 @@
       white-space: nowrap;
     }
 
-    /* On very small screens, sticky columns can become intrusive; disable stickiness */
-    @media (max-width: 576px) {
+    /* On small screens, sticky columns can become intrusive; disable stickiness */
+    @media (max-width: 768px) {
       .team-status-table th.sticky-col-1,
       .team-status-table td.sticky-col-1,
       .team-status-table th.sticky-col-2,
@@ -166,6 +181,7 @@
         position: static;
         left: auto;
         z-index: auto;
+        box-shadow: none;
       }
     }
 

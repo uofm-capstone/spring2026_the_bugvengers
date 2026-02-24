@@ -115,6 +115,11 @@
     z-index: 5;
 }
 
+.team-status-table thead th.sticky-col-1,
+.team-status-table thead th.sticky-col-2 {
+    z-index: 30;
+}
+
 .team-status-table th.sticky-col-1,
 .team-status-table td.sticky-col-1 {
     position: sticky;
@@ -122,7 +127,7 @@
     min-width: var(--sticky-col-1-width);
     max-width: var(--sticky-col-1-width);
     background: var(--bs-tertiary-bg);
-    z-index: 6;
+    z-index: 15;
 }
 
 .team-status-table th.sticky-col-2,
@@ -132,7 +137,13 @@
     min-width: var(--sticky-col-2-width);
     max-width: var(--sticky-col-2-width);
     background: var(--bs-tertiary-bg);
-    z-index: 6;
+    z-index: 15;
+    box-shadow: 1px 0 0 var(--bs-border-color);
+}
+
+.team-status-table tbody td.sticky-col-1,
+.team-status-table tbody td.sticky-col-2 {
+    z-index: 20;
 }
 
 /* Ensure long names never paint over other columns */

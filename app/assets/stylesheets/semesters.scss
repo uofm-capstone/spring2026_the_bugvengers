@@ -41,6 +41,7 @@
     align-items: center;
     justify-content: center;
     line-height: 1;
+    cursor: help;
 }
 
 .ui-tooltip:focus-visible {
@@ -87,6 +88,8 @@
 
 .ui-tooltip:hover::after,
 .ui-tooltip:hover::before,
+.ui-tooltip:focus::after,
+.ui-tooltip:focus::before,
 .ui-tooltip:focus-visible::after,
 .ui-tooltip:focus-visible::before {
     display: block;

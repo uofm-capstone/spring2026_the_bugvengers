@@ -190,3 +190,6 @@ html {
   position: relative;
   z-index: 1100; /* higher than any nearby overlays */
 }
+
+// Controller-scoped stylesheets
+@import "semesters";

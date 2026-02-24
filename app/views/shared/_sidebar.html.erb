@@ -2,7 +2,7 @@
   <div class="fw-bold mb-4">Navigation</div>
 
   <nav class="nav nav-pills flex-column gap-1">
-    <%= nav_link_to "Semesters", semesters_path, class: "fs-5 link-dark", active_when: { controller: "semesters" } %>
+    <%= nav_link_to "Semesters", semesters_path, class: "fs-5 link-dark", active_when: -> { controller_name == "semesters" && action_name != "status" } %>
     <%= nav_link_to "Teams", teams_path, class: "fs-5 link-dark", active_when: { controller: "teams" } %>
     <%= nav_link_to "Students", students_path, class: "fs-5 link-dark", active_when: { controller: "students" } %>
     <%= nav_link_to "Status", status_page_path, class: "fs-5 link-dark", active_when: { controller: "semesters", action: "status" } %>

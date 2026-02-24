@@ -57,8 +57,12 @@ module SprintsHelper
 
 
   def icon_html(icon, title)
+    safe_title = ERB::Util.html_escape(title.to_s)
+
     "<div class='d-inline-flex p-2 m-0'><p class='p-0 m-0'>" +
-      ActionController::Base.helpers.image_tag(icon, class: "", style: "height:16px", title: title) +
+      "<span class='ui-tooltip' tabindex='0' aria-label='#{safe_title}' data-tooltip='#{safe_title}'>" +
+      ActionController::Base.helpers.image_tag(icon, class: "team-status-icon", alt: "", aria: { hidden: true }) +
+      "</span>" +
       "</p></div>"
   end
 

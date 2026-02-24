@@ -5,3 +5,198 @@
 .lnk-blue {
     color: #0D3182;
 }
+
+/* ----------------------------
+ * Team Status UI refinements
+ * - Lightweight tooltips (CSS-only)
+ * - More readable, scrollable status grid on mobile
+ * ---------------------------- */
+
+.team-status-legend {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 0.75rem 1rem;
+    justify-content: center;
+    margin: 0;
+    padding: 0;
+}
+
+.team-status-legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.team-status-icon {
+    height: 16px;
+    width: 16px;
+    display: inline-block;
+}
+
+/* Tooltip trigger wrapper.
+     Accessible on keyboard via tabindex; does not require JS. */
+.ui-tooltip {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+    cursor: help;
+}
+
+.ui-tooltip:focus-visible {
+    outline: 2px solid var(--bs-primary);
+    outline-offset: 2px;
+    border-radius: 4px;
+}
+
+.ui-tooltip::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    left: 50%;
+    bottom: calc(100% + 8px);
+    transform: translateX(-50%);
+    z-index: 1080;
+
+    display: none;
+    max-width: 260px;
+    padding: 0.35rem 0.5rem;
+    border: 1px solid var(--bs-border-color);
+    border-radius: 6px;
+    background: var(--bs-body-bg);
+    color: var(--bs-body-color);
+    font-size: 0.75rem;
+    white-space: normal;
+    text-align: left;
+}
+
+.ui-tooltip::before {
+    content: "";
+    position: absolute;
+    left: 50%;
+    bottom: calc(100% + 2px);
+    transform: translateX(-50%);
+    z-index: 1081;
+
+    display: none;
+    width: 0;
+    height: 0;
+    border-left: 6px solid transparent;
+    border-right: 6px solid transparent;
+    border-top: 6px solid var(--bs-border-color);
+}
+
+.ui-tooltip:hover::after,
+.ui-tooltip:hover::before,
+.ui-tooltip:focus::after,
+.ui-tooltip:focus::before,
+.ui-tooltip:focus-visible::after,
+.ui-tooltip:focus-visible::before {
+    display: block;
+}
+
+/* Big sprint status grid: keep it scrollable and readable. */
+.team-status-table-wrap {
+    -webkit-overflow-scrolling: touch;
+    position: relative;
+    isolation: isolate;
+}
+
+.team-status-table {
+    --sticky-col-1-width: 160px;
+    --sticky-col-2-width: 140px;
+    border-collapse: separate;
+    border-spacing: 0;
+    white-space: nowrap;
+    position: relative;
+}
+
+.team-status-table thead th {
+    position: sticky;
+    top: 0;
+    background-color: var(--bs-light, #f8f9fa);
+    z-index: 5;
+}
+
+.team-status-table thead th.sticky-col-1,
+.team-status-table thead th.sticky-col-2 {
+    z-index: 60;
+    background-color: var(--bs-light, #f8f9fa);
+}
+
+.team-status-table th.sticky-col-1,
+.team-status-table td.sticky-col-1 {
+    position: sticky;
+    left: 0;
+    width: var(--sticky-col-1-width);
+    min-width: var(--sticky-col-1-width);
+    max-width: var(--sticky-col-1-width);
+    background-color: var(--bs-body-bg, #ffffff);
+    background-clip: padding-box;
+    z-index: 40;
+    -webkit-transform: translateZ(0);
+    transform: translateZ(0);
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
+}
+
+.team-status-table th.sticky-col-2,
+.team-status-table td.sticky-col-2 {
+    position: sticky;
+    left: var(--sticky-col-1-width);
+    width: var(--sticky-col-2-width);
+    min-width: var(--sticky-col-2-width);
+    max-width: var(--sticky-col-2-width);
+    background-color: var(--bs-body-bg, #ffffff);
+    background-clip: padding-box;
+    z-index: 40;
+    box-shadow: 1px 0 0 var(--bs-border-color);
+    -webkit-transform: translateZ(0);
+    transform: translateZ(0);
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
+}
+
+.team-status-table tbody td.sticky-col-1,
+.team-status-table tbody td.sticky-col-2 {
+    z-index: 50;
+}
+
+/* Ensure long names never paint over other columns */
+.team-status-table .sticky-cell {
+    display: block;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+    .team-status-table {
+        --sticky-col-1-width: 140px;
+        --sticky-col-2-width: 120px;
+        font-size: 0.78rem;
+    }
+
+    /* Sticky columns are helpful on desktop, but can overlap on small widths.
+         Disable stickiness at <=768px to keep the grid readable. */
+    .team-status-table th.sticky-col-1,
+    .team-status-table td.sticky-col-1,
+    .team-status-table th.sticky-col-2,
+    .team-status-table td.sticky-col-2 {
+        position: static;
+        left: auto;
+        z-index: auto;
+        background: inherit;
+    }
+
+    .team-status-table th,
+    .team-status-table td {
+        padding: 0.35rem 0.4rem;
+    }
+
+    .sprint-toggle {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.85rem;
+    }
+}

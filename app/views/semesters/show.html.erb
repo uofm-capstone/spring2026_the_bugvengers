@@ -118,39 +118,90 @@
       padding: 8px 10px;
     }
 
-    .table {
+    .team-status-table {
+      --sticky-col-1-width: 160px;
+      --sticky-col-2-width: 140px;
       border-collapse: separate;
       border-spacing: 0;
       white-space: nowrap;
     }
 
-    .table thead th {
+    .team-status-table thead th {
       position: sticky;
       top: 0;
-      background: #f8f9fa;
+      background-color: var(--bs-light, #f8f9fa);
       z-index: 5;
     }
 
-    .table th.sticky-col-1,
-    .table td.sticky-col-1 {
+    .team-status-table th.sticky-col-1,
+    .team-status-table td.sticky-col-1 {
       position: sticky;
       left: 0;
-      background: #f8f9fa;
-      z-index: 6; /* higher so it stays above scrolling cells */
+      width: var(--sticky-col-1-width);
+      background-color: var(--bs-body-bg, #ffffff);
+      background-clip: padding-box;
+      z-index: 40;
+      -webkit-transform: translateZ(0);
+      transform: translateZ(0);
+      -webkit-backface-visibility: hidden;
+      backface-visibility: hidden;
     }
 
-    .table th.sticky-col-2,
-    .table td.sticky-col-2 {
+    .team-status-table th.sticky-col-2,
+    .team-status-table td.sticky-col-2 {
       position: sticky;
-      left: 98px; /* match width of first column */
-      background: #f8f9fa;
-      z-index: 6;
+      left: var(--sticky-col-1-width);
+      width: var(--sticky-col-2-width);
+      background-color: var(--bs-body-bg, #ffffff);
+      background-clip: padding-box;
+      z-index: 40;
+      box-shadow: 1px 0 0 var(--bs-border-color);
+      -webkit-transform: translateZ(0);
+      transform: translateZ(0);
+      -webkit-backface-visibility: hidden;
+      backface-visibility: hidden;
+    }
+
+    /* Make sure the top-left header cells win all overlaps */
+    .team-status-table thead th.sticky-col-1,
+    .team-status-table thead th.sticky-col-2 {
+      z-index: 60;
+      background-color: var(--bs-light, #f8f9fa);
+    }
+
+    /* Body sticky cells should still stay above scrolling cells */
+    .team-status-table tbody td.sticky-col-1,
+    .team-status-table tbody td.sticky-col-2 {
+      z-index: 50;
+    }
+
+    /* Prevent sticky content from visually covering other columns */
+    .team-status-table th.sticky-col-1,
+    .team-status-table td.sticky-col-1,
+    .team-status-table th.sticky-col-2,
+    .team-status-table td.sticky-col-2 {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    /* On small screens, sticky columns can become intrusive; disable stickiness */
+    @media (max-width: 768px) {
+      .team-status-table th.sticky-col-1,
+      .team-status-table td.sticky-col-1,
+      .team-status-table th.sticky-col-2,
+      .team-status-table td.sticky-col-2 {
+        position: static;
+        left: auto;
+        z-index: auto;
+        box-shadow: none;
+      }
     }
 
     /* Sprint buttons */
     .sprint-toggle.active {
-      background-color: #0d6efd;
-      color: #ffffff;
+      background-color: var(--bs-primary);
+      color: var(--bs-white);
     }
   </style>
 </head>
@@ -180,18 +231,49 @@
 
               <div class="mt-3 mb-3">
                 <h5>Legend:</h5>
-                <ul class="list-inline">
-                  <li class="list-inline-item">
-                    <%= image_tag "check-circle-fill.svg", style: "height:16px" %> Good
+                <ul class="list-inline team-status-legend">
+                  <li class="list-inline-item team-status-legend-item">
+                    <span
+                      class="ui-tooltip"
+                      tabindex="0"
+                      aria-label="Good: everything required is present."
+                      data-tooltip="Good: Everything required is present (no warnings).">
+                      <%= image_tag "check-circle-fill.svg", class: "team-status-icon", alt: "", aria: { hidden: true } %>
+                    </span>
+                    <span>Good</span>
                   </li>
-                  <li class="list-inline-item">
-                    <%= image_tag "exclamation-circle-fill-yellow.svg", style: "height:16px" %> Acceptable
+
+                  <li class="list-inline-item team-status-legend-item">
+                    <span
+                      class="ui-tooltip"
+                      tabindex="0"
+                      aria-label="Acceptable: some data may be missing, but not critical."
+                      data-tooltip="Acceptable: Minor issues or partial data; review if needed.">
+                      <%= image_tag "exclamation-circle-fill-yellow.svg", class: "team-status-icon", alt: "", aria: { hidden: true } %>
+                    </span>
+                    <span>Acceptable</span>
                   </li>
-                  <li class="list-inline-item">
-                    <%= image_tag "exclamation-triangle-fill-red.svg", style: "height:16px" %> Poor
+
+                  <li class="list-inline-item team-status-legend-item">
+                    <span
+                      class="ui-tooltip"
+                      tabindex="0"
+                      aria-label="Poor: action needed."
+                      data-tooltip="Poor: Missing submissions or low scores; action needed.">
+                      <%= image_tag "exclamation-triangle-fill-red.svg", class: "team-status-icon", alt: "", aria: { hidden: true } %>
+                    </span>
+                    <span>Poor</span>
                   </li>
-                  <li class="list-inline-item">
-                    <%= image_tag "question-circle-fill.svg", style: "height:16px" %> No Data
+
+                  <li class="list-inline-item team-status-legend-item">
+                    <span
+                      class="ui-tooltip"
+                      tabindex="0"
+                      aria-label="No data: nothing recorded yet."
+                      data-tooltip="No Data: No submission/metric recorded yet.">
+                      <%= image_tag "question-circle-fill.svg", class: "team-status-icon", alt: "", aria: { hidden: true } %>
+                    </span>
+                    <span>No Data</span>
                   </li>
                 </ul>
               </div>
@@ -214,8 +296,8 @@
               </div>
 
               <!-- TABLE -->
-              <div class="table-responsive">
-                <table class="table table-bordered align-middle text-center">
+              <div class="table-responsive team-status-table-wrap">
+                <table class="table table-bordered align-middle text-center team-status-table">
                   <thead>
                     <tr>
                       <th class="sticky-col-1" rowspan="3">Team Name</th>
@@ -273,12 +355,16 @@
                         <tr>
                           <% if i == 0 %>
                             <td class="sticky-col-1" rowspan="<%= team.students.size %>">
-                              <%= link_to team.name, teams_path(@semester), class: "text-decoration-none fw-semibold" %>
+                              <div class="sticky-cell">
+                                <%= link_to team.name, teams_path(@semester), class: "text-decoration-none fw-semibold" %>
+                              </div>
                             </td>
                           <% end %>
 
-                          <td class="sticky-col-2" style="white-space: nowrap;">
-                            <%= "#{student.name.split.first} #{student.name.split.last&.first}." %>
+                          <td class="sticky-col-2">
+                            <div class="sticky-cell">
+                              <%= "#{student.name.split.first} #{student.name.split.last&.first}." %>
+                            </div>
                           </td>
 
                           <% @sprint_list.each do |sprint| %>
@@ -305,23 +391,33 @@
                                     <% end %>
                                   <% when "PP" %>
                                     <!-- Product Progress — Metric: Cards moved through workflow (To-Do → In-Progress → Done) per team member -->
-                                    <%= image_tag "check-circle-fill.svg", style: "height:16px" %>
+                                    <span class="ui-tooltip" tabindex="0" aria-label="OK" data-tooltip="OK">
+                                      <%= image_tag "check-circle-fill.svg", class: "team-status-icon", alt: "", aria: { hidden: true } %>
+                                    </span>
 
                                   <% when "CBP" %>
                                     <!-- Coding Best Practices — Metric: Count of commits and lines of code changed per team member -->
-                                    <%= image_tag "check-circle-fill.svg", style: "height:16px" %>
+                                    <span class="ui-tooltip" tabindex="0" aria-label="OK" data-tooltip="OK">
+                                      <%= image_tag "check-circle-fill.svg", class: "team-status-icon", alt: "", aria: { hidden: true } %>
+                                    </span>
 
                                   <% when "TSP" %>
                                     <!-- Time Spent Since Progress Check — Metric: Sum of work hours or task updates since last progress check -->
-                                    <%= image_tag "check-circle-fill.svg", style: "height:16px" %>
+                                    <span class="ui-tooltip" tabindex="0" aria-label="OK" data-tooltip="OK">
+                                      <%= image_tag "check-circle-fill.svg", class: "team-status-icon", alt: "", aria: { hidden: true } %>
+                                    </span>
 
                                   <% when "KU", "TS", "CC", "SR", "PF", "D" %>
                                     <!-- N/A metrics — Metric: Not applicable (no direct data collected) -->
-                                    <%= image_tag "question-circle-fill.svg", style: "height:16px" %>
+                                    <span class="ui-tooltip" tabindex="0" aria-label="No data / N/A" data-tooltip="No data / N/A">
+                                      <%= image_tag "question-circle-fill.svg", class: "team-status-icon", alt: "", aria: { hidden: true } %>
+                                    </span>
 
                                   <% else %>
                                     <!-- Unknown rubric type — Metric: Description unavailable -->
-                                    <%= image_tag "question-circle-fill.svg", style: "height:16px" %>
+                                    <span class="ui-tooltip" tabindex="0" aria-label="No data / N/A" data-tooltip="No data / N/A">
+                                      <%= image_tag "question-circle-fill.svg", class: "team-status-icon", alt: "", aria: { hidden: true } %>
+                                    </span>
                                 <% end %>
                               </td>
                             <% end %>

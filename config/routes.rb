@@ -4,7 +4,6 @@ Rails.application.routes.draw do
   devise_for :users
   # resources :sprints
 
-
   # Student List Add controller
   post '/import/home', to: 'student_list_add#import_home'
 
@@ -29,7 +28,6 @@ Rails.application.routes.draw do
   get 'students/:id', to: 'students#show', as: 'student'
   patch 'students/:id', to: 'students#update'
   delete 'students/:id', to: 'students#destroy', as: 'destroy_student'
-
 
   resources :semesters do
     post :select, on: :member
@@ -69,5 +67,8 @@ Rails.application.routes.draw do
   resources :semesters do
     resources :repositories, only: [:new, :create, :show], controller: 'semesters/repositories'
   end
-end
 
+  # Team registration controller
+  get 'team_registration', to: 'team_registrations#new', as: 'new_team_registration'
+  post 'team_registration', to: 'team_registrations#create', as: 'team_registration'
+end

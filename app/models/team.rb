@@ -7,4 +7,6 @@ class Team < ApplicationRecord
   # Possible for there to be multiple same team name - go by semester
   validates :name, uniqueness: { scope: :semester_id, message: "already exists for this semester" }
 
+  validates :semester_id, presence: true
+  validates :description, presence: true
 end

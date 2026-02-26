@@ -1,2 +1,77 @@
-<h1>TeamRegistrations#new</h1>
-<p>Find me in app/views/team_registrations/new.html.erb</p>
+<section class="vh-100">
+  <div class="mask d-flex align-items-center h-100">
+    <div class="container h-100">
+      <div class="row d-flex justify-content-center align-items-center h-100">
+        <div class="col-12 col-md-10 col-lg-8">
+          <div class="card" style="border-radius: 15px;">
+            <div class="card-body p-5">
+              <h2 class="text-uppercase text-center mb-5">TEAM REGISTRATION</h2>
+
+              <% if @team.errors.any? %>
+                <div class="alert alert-danger">
+                  <ul>
+                    <% @team.errors.full_messages.each do |message| %>
+                      <li><%= message %></li>
+                    <% end %>
+                  </ul>
+                </div>
+              <% end %>
+
+              <%= form_with(model: @team, url: team_registration_path, method: :post, local: true) do |f| %>
+
+                <div class="form-outline mb-4">
+                  <%= f.label :name, "Team Name" %>
+                  <%= f.text_field :name, class: "form-control form-control-lg", required: true %>
+                </div>
+
+                <div class="form-outline mb-4">
+                  <%= f.label :description, "Project Description" %>
+                  <%= f.text_area :description, rows: 4, class: "form-control form-control-lg", required: true %>
+                </div>
+
+                <div class="form-outline mb-4">
+                  <%= f.label :semester_id, "Semester" %>
+                  <%= f.collection_select :semester_id,
+                        @semesters,
+                        :id,
+                        :name_for_select,
+                        { prompt: "Select a Semester" },
+                        { class: "form-control form-control-lg", required: true } %>
+                </div>
+
+                <hr>
+                <h5 class="mb-3">Project Links <span class="text-muted small">(optional)</span></h5>
+
+                <div class="form-outline mb-4">
+                  <%= f.label :repo_url, "GitHub Repository URL" %>
+                  <%= f.url_field :repo_url, class: "form-control" %>
+                </div>
+
+                <div class="form-outline mb-4">
+                  <%= f.label :timesheet_url, "Timesheet URL" %>
+                  <%= f.url_field :timesheet_url, class: "form-control" %>
+                </div>
+
+                <div class="form-outline mb-4">
+                  <%= f.label :project_board_url, "Project Board URL" %>
+                  <%= f.url_field :project_board_url, class: "form-control" %>
+                </div>
+
+                <div class="form-outline mb-4">
+                  <%= f.label :client_notes_url, "Client Notes URL" %>
+                  <%= f.url_field :client_notes_url, class: "form-control" %>
+                </div>
+
+                <div class="d-flex justify-content-center mt-4">
+                  <%= f.submit "Submit Registration", class: "btn btn-success btn-lg px-5" %>
+                </div>
+
+              <% end %>
+
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>

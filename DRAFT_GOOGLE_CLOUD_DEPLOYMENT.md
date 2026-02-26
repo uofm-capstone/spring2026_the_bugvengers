@@ -202,29 +202,14 @@ gcloud sql instances describe tag-app-db --format='value(connectionName)'
 
 ## Store Required Secrets
 
-Store sensitive values (Rails secret key, DB password) securely in Secret Manager and grant access to Cloud Build:
-```bash
-echo -n "YOUR_SECRET_KEY_BASE" | gcloud secrets create secret-key-base --data-file=-
-echo -n "YOUR_DB_PASSWORD" | gcloud secrets create db-password --data-file=-
-
-gcloud secrets add-iam-policy-binding secret-key-base \
-  --member="serviceAccount:$(gcloud projects describe $(gcloud config get-value project) --format='value(projectNumber)')@cloudbuild.gserviceaccount.com" \
-  --role="roles/secretmanager.secretAccessor"
-
-gcloud secrets add-iam-policy-binding db-password \
-  --member="serviceAccount:$(gcloud projects describe $(gcloud config get-value project) --format='value(projectNumber)')@cloudbuild.gserviceaccount.com" \
-  --role="roles/secretmanager.secretAccessor"
-```
-**Explanation:** This stores your secrets securely and allows Cloud Build to access them during deployment.
-**Test:**
-**In Google Cloud Console:**
-
 Store sensitive values (Rails secret key, DB password) securely in Secret Manager and grant access to Cloud Build and Cloud Run:
 
 ```bash
 # Create secrets
 echo -n "YOUR_SECRET_KEY_BASE" | gcloud secrets create secret-key-base --data-file=-
 echo -n "YOUR_DB_PASSWORD" | gcloud secrets create db-password --data-file=-
+
+1.
 
 # Grant Secret Manager access to Cloud Build service account (for CI/CD builds)
 gcloud secrets add-iam-policy-binding secret-key-base \
@@ -234,6 +219,8 @@ gcloud secrets add-iam-policy-binding secret-key-base \
 gcloud secrets add-iam-policy-binding db-password \
   --member="serviceAccount:$(gcloud projects describe $(gcloud config get-value project) --format='value(projectNumber)')@cloudbuild.gserviceaccount.com" \
   --role="roles/secretmanager.secretAccessor"
+
+2. 
 
 # Grant Secret Manager and Cloud SQL access to Cloud Run service account (for deployed app)
 # Replace YOUR_PROJECT_NUMBER and YOUR_PROJECT_ID with your actual values
@@ -348,7 +335,6 @@ gcloud artifacts repositories delete spring2026-tag-repo --location=us-central1
 gcloud secrets delete secret-key-base
 gcloud secrets delete db-password
 ```
-
 
 ## 📎 Notes for the Future Teams
 

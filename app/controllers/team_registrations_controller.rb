@@ -11,6 +11,16 @@ class TeamRegistrationsController < ApplicationController
     @team = Team.new(team_params)
 
     if @team.save
+      if current_user&.guest?
+        current_user.update!(role: :student)
+
+        student = Student.find_or_create_by(email: current_user.email, semester_id: @team.semester_id) do |s|
+          s.full_name = current_user.email
+        end
+
+        StudentTeam.create!(team: @team, student: student)
+      end
+
       redirect_to root_path, notice: "Team registration submitted successfully."
     else
       @semesters = Semester.all

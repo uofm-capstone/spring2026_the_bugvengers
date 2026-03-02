@@ -13,7 +13,9 @@ class TeamRegistrationsController < ApplicationController
     if @team.save
       if current_user&.guest?
         current_user.update!(role: :student)
+      end
 
+      if current_user
         student = Student.find_or_create_by(email: current_user.email, semester_id: @team.semester_id) do |s|
           s.full_name = current_user.email
         end

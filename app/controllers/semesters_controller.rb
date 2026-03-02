@@ -321,57 +321,35 @@ end
   # Displays semester progress status for all teams/sprints.
 def status
   @semester = Semester.find_by(id: params[:id])
-  return redirect_to(semesters_path) unless @semester
+    return redirect_to(semesters_path) unless @semester
 
-  session[:last_viewed_semester_id] = @semester.id
+    session[:last_viewed_semester_id] = @semester.id
 
-  @teams       = @semester.teams
-  @sprints     = @semester.sprints
-  @sprint_list = @sprints.pluck(:name)
+    @teams = @semester.teams
+    @sprint_list = @semester.sprints.pluck(:name)
+    @flags = {}
 
-  # Your existing flags logic (kept as-is)
-  @flags = {}
-  @sprint_list.each do |sprint|
-    @flags[sprint] = {}
+    @sprint_list.each do |sprint|
+      @flags[sprint] = {}
+      @teams.each do |team|
+        @flags[sprint][team.name] = get_flags(@semester, sprint, team.name)
+      end
+    end
+
+    @repos = current_user.repositories
+    @sprints = @semester.sprints
+    @start_dates, @end_dates, @team_names, @repo_owners, @repo_names, @access_tokens, @sprint_numbers = get_git_info(@semester)
+
+    # Calculate metrics for display.
+    @service = GithubService.new
+
+    @team_project_data = {}
     @teams.each do |team|
-      @flags[sprint][team.name] = get_flags(@semester, sprint, team.name)
+      project_cards = @service.project_cards(team.project_board_url)
+      @team_project_data[team.name] = project_cards
     end
-  end
-
-  # If you still need these for the view, keep them
-  @repos = current_user.repositories
-  @start_dates, @end_dates, @team_names, @repo_owners, @repo_names,
-    @access_tokens, @sprint_numbers = get_git_info(@semester)
-
-  # GitHub project board data per team (NOW uses per-team token)
-  @team_project_data   = {}
-  @team_project_errors = {}
-
-  @teams.each do |team|
-    begin
-      if team.github_token.blank?
-        @team_project_errors[team.name] = "Missing GitHub token"
-        next
-      end
-
-      if team.project_board_url.blank?
-        @team_project_errors[team.name] = "Missing project board URL"
-        next
-      end
-
-      service = GithubService.new(token: team.github_token)
-      @team_project_data[team.name] = service.project_cards(team.project_board_url)
-
-    rescue Octokit::Unauthorized
-      @team_project_errors[team.name] = "GitHub token invalid/expired (401)"
-    rescue Octokit::Forbidden => e
-      @team_project_errors[team.name] = "Forbidden (403): #{e.message}"
-    rescue => e
-      @team_project_errors[team.name] = "#{e.class}: #{e.message}"
-    end
-  end
-
-  render :status
+    
+    render :show
 end
 
   # --------------------------------------------------------

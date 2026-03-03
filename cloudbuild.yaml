@@ -3,12 +3,12 @@
 # ---- Substitutions you can override per build/trigger ----
 # Example values shown; change as needed when you run the build.
 substitutions:
-  _REGION: "us-south1"             # your Cloud Run URL is us-south1
-  _REPO: "checkmate-repo"          # your Artifact Registry repo name
-  _IMAGE: "checkmate-app"          # your image name
-  _SERVICE: "fall2025-checkmate"   # your Cloud Run service name
-  _SQL_REGION: "us-south1"         # set to your Cloud SQL instance’s region
-  _SQL_INSTANCE: "checkmate-db-2"  # your Cloud SQL instance name
+  _REGION: "us-central1"             # your Cloud Run URL is us-south1
+  _REPO: "spring2026-tag-repo"          # your Artifact Registry repo name
+  _IMAGE: "tag-app"          # your image name
+  _SERVICE: "tag-app-service"   # your Cloud Run service name
+  _SQL_REGION: "us-central1"         # set to your Cloud SQL instance’s region
+  _SQL_INSTANCE: "tag-app-db"  # your Cloud SQL instance name
 
 steps:
   # Step 1: Build Docker image

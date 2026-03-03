@@ -4,6 +4,9 @@ Rails.application.configure do
   # Settings specified here will take precedence over those in config/application.rb.
   config.hosts << /\.run\.app\z/
 
+  # allows deployed sites to be a host and not be blocked by rails' security features
+  config.hosts << /.*\.us-central1\.run\.app/
+
   # Show full error reports even in production (for debugging only!)
   config.consider_all_requests_local = true
 
@@ -94,8 +97,7 @@ Rails.application.configure do
   # config.logger = ActiveSupport::TaggedLogging.new(Syslog::Logger.new "app-name")
 
   if ENV["RAILS_LOG_TO_STDOUT"].present?
-    
-    logger           = ActiveSupport::Logger.new(STDOUT) 
+    logger           = ActiveSupport::Logger.new(STDOUT)
     logger.formatter = config.log_formatter
     config.logger    = ActiveSupport::TaggedLogging.new(logger)
   end

@@ -23,6 +23,5 @@ production:
   pool: 5
   username: rails_user
   password: <%= ENV['DB_PASSWORD'] %>
-  database: checkmate_app_production
-  # Cloud SQL socket: <PROJECT_ID>:<REGION>:<INSTANCE>
-  host: /cloudsql/checkmate-475818:us-south1:checkmate-db-2
+  database: tag_app_production
+  host: /cloudsql/capstone-tool-assisted-grading:us-central1:tag-app-db

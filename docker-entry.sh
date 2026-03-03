@@ -9,4 +9,7 @@ fi
 echo "Running migrations..."
 bundle exec rails db:migrate
 
-exec bundle exec "$@"
+echo "Seeding database..."
+bundle exec rails db:seed
+
+exec "$@"

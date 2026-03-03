@@ -49,4 +49,4 @@ EXPOSE 8080
 ENTRYPOINT ["./docker-entry.sh"]
 
 # Let Puma (via config/puma.rb) pick up ENV["PORT"] from Cloud Run
-CMD ["rails", "server", "-b", "0.0.0.0"]
+CMD ["bundle", "exec", "puma", "-C", "config/puma.rb"]

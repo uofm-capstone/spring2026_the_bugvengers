@@ -33,12 +33,14 @@ RUN yarn install --production
 # Copy the rest of the application
 COPY . .
 
+# Create tmp directories that Rails needs at runtime
+RUN mkdir -p tmp/pids tmp/cache tmp/sockets
+
 # Ensure entrypoint is executable
 RUN chmod +x ./docker-entry.sh
 
 # Precompile assets (needs a dummy secret + dummy DB URL at build time)
-ENV SECRET_KEY_BASE=dummy DATABASE_URL=postgres://user:pass@localhost:5432/dummy
-RUN bundle exec rake assets:precompile || true
+RUN SECRET_KEY_BASE=dummy DATABASE_URL=postgres://user:pass@localhost:5432/dummy bundle exec rake assets:precompile || true
 
 # Expose (harmless on Cloud Run)
 EXPOSE 8080

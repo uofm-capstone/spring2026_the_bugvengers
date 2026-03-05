@@ -363,16 +363,16 @@ gcloud secrets delete [SECRET_KEY_NAME]
 gcloud secrets delete [DB_PASSWORD_SECRET_NAME]
 ```
 
-# [Note to TA: Everything past this point is to be edited in Sprint 3]
-
 ## CI/CD Automation (Optional but Recommended)
 
 Automate build, push, and deploy steps using Cloud Build triggers.
 
 **How to set up:**
-1. Open Cloud Build in the Google Cloud Console.
-2. Create a trigger for your repository to run on push to `main`.
-3. Ensure your `cloudbuild.yaml` is present in the repo root.
+1. Navigate to the Cloud Build page in the Google Cloud Console.
+2. Go to the Repositories page to create a host connection to link your Github repository through. NOTE: The professor may need to do this step on your project in the Cloud Console since they have admin permissions in the Capstone Github organization.
+3. Go to the Triggers page to create a trigger for your repository to build a docker image and deploy on push to `main`.
+
+Ensure your `cloudbuild.yaml` is present in the repo root before creating a trigger.
 
 ## 📎 Notes for the Future Teams
 
@@ -380,4 +380,4 @@ Important reminders for future deployments:
 - Update secret values before deployment
 - Re-create Cloud SQL user/password and update secret
 - Review and verify `cloudbuild.yaml` and `config/database.yml`
-- Check that the deployed service is running via `gcloud run services list`
+- Check that the deployed service is running via `gcloud run services list` or on the Cloud Run page in the Google Cloud Console

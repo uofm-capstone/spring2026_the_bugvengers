@@ -81,7 +81,7 @@ All gcloud commands run against the currently active project.
 Set the project explicitly:
 
 ```bash
-gcloud config set project capstone-tool-assisted-grading
+gcloud config set project [PROJECT_ID]
 ```
 
 Verify:
@@ -92,7 +92,7 @@ gcloud config get-value project
 
 Expected output:
 
-capstone-tool-assisted-grading
+[PROJECT_ID]
 
 ---
 
@@ -104,7 +104,7 @@ To verify the project is accessible:
 gcloud projects list
 ```
 
-Ensure capstone-tool-assisted-grading appears in the list.
+Ensure [PROJECT_ID] appears in the list.
 
 ---
 
@@ -141,8 +141,8 @@ You should see your account and project listed.
 
 Download the project code to your local machine:
 ```bash
-git clone https://github.com/YOUR_ORG/YOUR_REPO.git
-cd YOUR_REPO
+git clone https://github.com/[INSERT_GITHUB_ORG]/[INSERT_REPO_NAME].git
+cd [INSERT_REPO_NAME]
 ```
 **Test:**
 Run `ls` and check that the project files exist in your directory.
@@ -174,80 +174,120 @@ Create a managed PostgreSQL database for your app:
 
 ```bash
 # 1. Create a Cloud SQL instance (replace INSTANCE_ID and REGION as needed)
-gcloud sql instances create tag-app-db \
+gcloud sql instances create [DB_INSTANCE_NAME] \
   --database-version=POSTGRES_14 \
   --tier=db-f1-micro \
-  --region=us-central1
+  --region=[REGION]
 
 # 2. Create a database
-gcloud sql databases create tag_app_production --instance=tag-app-db
+gcloud sql databases create [DATABASE_NAME] --instance=[DB_INSTANCE_NAME]
 
 # 3. Create a user (replace YOUR_PASSWORD with a strong password)
-gcloud sql users create rails_user --instance=tag-app-db --password=YOUR_PASSWORD
+gcloud sql users create [DB_USERNAME] --instance=[DB_INSTANCE_NAME] --password=YOUR_PASSWORD
 
 # 4. Get the instance connection name
-gcloud sql instances describe tag-app-db --format='value(connectionName)'
+gcloud sql instances describe [DB_INSTANCE_NAME] --format='value(connectionName)'
 ```
 
 **Explanation & How to Test in Google Cloud Console:**
-- The first command creates a new PostgreSQL Cloud SQL instance named `tag-app-db` in the `us-central1` region.
-  - **Test:** In the Google Cloud Console, go to "SQL > Instances" and confirm you see `tag-app-db` listed. Click on it to view details.
-- The second command creates a database named `tag_app_production` inside that instance.
-  - **Test:** In the Console, click your instance, then the "Databases" tab. You should see `tag_app_production` listed.
-- The third command creates a user `rails_user` with your chosen password.
-  - **Test:** In the Console, click your instance, then the "Users" tab. You should see `rails_user` listed.
+- The first command creates a new PostgreSQL Cloud SQL instance named `[DB_INSTANCE_NAME]` in the `[REGION]` region.
+  - **Test:** In the Google Cloud Console, go to "SQL > Instances" and confirm you see `[DB_INSTANCE_NAME]` listed. Click on it to view details.
+- The second command creates a database named `[DATABASE_NAME]` inside that instance.
+  - **Test:** In the Console, click your instance, then the "Databases" tab. You should see `[DATABASE_NAME]` listed.
+- The third command creates a user `[DB_USERNAME]` with your chosen password.
+  - **Test:** In the Console, click your instance, then the "Users" tab. You should see `[DB_USERNAME]` listed.
 - The fourth command outputs the instance connection name needed for Cloud Run.
   - **Test:** In the Console, click your instance and look for the "Instance connection name" field on the "Overview" tab. It should match the output from the command.
 
 
 ## Store Required Secrets
 
-Store sensitive values (Rails secret key, DB password) securely in Secret Manager and grant access to Cloud Build and Cloud Run:
+Store sensitive values (Rails secret key, DB password) securely in Secret Manager and grant access to Cloud Build and Cloud Run.
+
+### Option 1: Using gcloud CLI (Recommended)
 
 ```bash
-# Create secrets
-echo -n "YOUR_SECRET_KEY_BASE" | gcloud secrets create secret-key-base --data-file=-
-echo -n "YOUR_DB_PASSWORD" | gcloud secrets create db-password --data-file=-
-
-1.
+# Create the Rails secret key in Secret Manager
+echo -n "YOUR_SECRET_KEY_BASE" | gcloud secrets create [SECRET_KEY_NAME] --data-file=-
+# Create the database password in Secret Manager
+echo -n "YOUR_DB_PASSWORD" | gcloud secrets create [DB_PASSWORD_SECRET_NAME] --data-file=-
 
 # Grant Secret Manager access to Cloud Build service account (for CI/CD builds)
-gcloud secrets add-iam-policy-binding secret-key-base \
+gcloud secrets add-iam-policy-binding [SECRET_KEY_NAME] \
+  --member="serviceAccount:$(gcloud projects describe $(gcloud config get-value project) --format='value(projectNumber)')@cloudbuild.gserviceaccount.com" \
+  --role="roles/secretmanager.secretAccessor"
+  
+# Grant Secret Manager access to Cloud Build for DB password
+gcloud secrets add-iam-policy-binding [DB_PASSWORD_SECRET_NAME] \
   --member="serviceAccount:$(gcloud projects describe $(gcloud config get-value project) --format='value(projectNumber)')@cloudbuild.gserviceaccount.com" \
   --role="roles/secretmanager.secretAccessor"
 
-gcloud secrets add-iam-policy-binding db-password \
-  --member="serviceAccount:$(gcloud projects describe $(gcloud config get-value project) --format='value(projectNumber)')@cloudbuild.gserviceaccount.com" \
+# Grant Secret Manager access to Cloud Run service account (for deployed app)
+gcloud secrets add-iam-policy-binding [SECRET_KEY_NAME] \
+  --member="serviceAccount:[PROJECT_NUMBER]-compute@developer.gserviceaccount.com" \
   --role="roles/secretmanager.secretAccessor"
 
-2. 
-
-# Grant Secret Manager and Cloud SQL access to Cloud Run service account (for deployed app)
-# Replace YOUR_PROJECT_NUMBER and YOUR_PROJECT_ID with your actual values
-gcloud secrets add-iam-policy-binding secret-key-base \
-  --member="serviceAccount:YOUR_PROJECT_NUMBER-compute@developer.gserviceaccount.com" \
+# Grant Secret Manager access to Cloud Run for DB password
+gcloud secrets add-iam-policy-binding [DB_PASSWORD_SECRET_NAME] \
+  --member="serviceAccount:[PROJECT_NUMBER]-compute@developer.gserviceaccount.com" \
   --role="roles/secretmanager.secretAccessor"
 
-gcloud secrets add-iam-policy-binding db-password \
-  --member="serviceAccount:YOUR_PROJECT_NUMBER-compute@developer.gserviceaccount.com" \
-  --role="roles/secretmanager.secretAccessor"
-
-gcloud projects add-iam-policy-binding YOUR_PROJECT_ID \
-  --member="serviceAccount:YOUR_PROJECT_NUMBER-compute@developer.gserviceaccount.com" \
+# Grant Cloud SQL Client role to Cloud Run service account
+gcloud projects add-iam-policy-binding [PROJECT_ID] \
+  --member="serviceAccount:[PROJECT_NUMBER]-compute@developer.gserviceaccount.com" \
   --role="roles/cloudsql.client"
 ```
 
-**Explanation:**
-- The first set of commands grants Secret Manager access to the Cloud Build service account (for CI/CD builds).
-- The second set grants Secret Manager Secret Accessor and Cloud SQL Client roles to the Cloud Run service account (for the deployed app to access secrets and Cloud SQL).
-
 **Test:**
 - Run `gcloud secrets list` to see your secrets.
-- Run `gcloud secrets versions access latest --secret=secret-key-base` to verify the value (if you have access).
+- Run `gcloud secrets versions access latest --secret=[SECRET_KEY_NAME]` to verify the value (if you have access).
 - In IAM, confirm both service accounts have the correct roles.
 
+### Option 2: Using Google Cloud Console
+
+**Step 1: Create Secrets**
+
+1. Go to "Security > Secret Manager".
+2. Click "Create Secret".
+3. For the first secret:
+   - Name: `[SECRET_KEY_NAME]`
+   - Secret value: Paste your Rails `SECRET_KEY_BASE`
+   - Click "Create Secret"
+4. Repeat for the second secret:
+   - Name: `[DB_PASSWORD_SECRET_NAME]`
+   - Secret value: Paste your database password
+   - Click "Create Secret"
+
+**Step 2: Grant Permissions to Cloud Build Service Account**
+
+1. Still in "Secret Manager", click on `[SECRET_KEY_NAME]`.
+2. Click the "Permissions" tab.
+3. Click "Grant Access".
+4. Under "New principals", enter: `[PROJECT_NUMBER]@cloudbuild.gserviceaccount.com`
+5. Under "Role", select "Secret Manager Secret Accessor".
+6. Click "Save".
+7. Repeat steps 1-6 for `[DB_PASSWORD_SECRET_NAME]`.
+
+**Step 3: Grant Permissions to Cloud Run Service Account**
+
+1. Still in "Secret Manager", click on `[SECRET_KEY_NAME]`.
+2. Click the "Permissions" tab.
+3. Click "Grant Access".
+4. Under "New principals", enter: `[PROJECT_NUMBER]-compute@developer.gserviceaccount.com`
+5. Under "Role", select "Secret Manager Secret Accessor".
+6. Click "Save".
+7. Repeat steps 1-6 for `[DB_PASSWORD_SECRET_NAME]`.
+
+**Step 4: Grant Cloud SQL Client Role to Cloud Run Service Account**
+
+1. Go to "IAM & Admin > IAM".
+2. Click the "Edit principal" (pencil icon) next to `[PROJECT_NUMBER]-compute@developer.gserviceaccount.com`.
+3. Click "Add Another Role".
+4. Search for "Cloud SQL Client" and select it.
+5. Click "Save".
+
 **In Google Cloud Console:**
-- Go to "Security > Secret Manager" and confirm `secret-key-base` and `db-password` are listed.
+- Go to "Security > Secret Manager" and confirm `[SECRET_KEY_NAME]` and `[DB_PASSWORD_SECRET_NAME]` are listed.
 - Click each secret to view versions and access permissions.
 - Go to "IAM & Admin > IAM" and confirm both Cloud Build and Cloud Run service accounts have the correct roles.
 
@@ -256,16 +296,16 @@ gcloud projects add-iam-policy-binding YOUR_PROJECT_ID \
 
 Create a Docker repository to store your app's container images:
 ```bash
-gcloud artifacts repositories create spring2026-tag-repo \
+gcloud artifacts repositories create [ARTIFACT_REGISTRY_REPO_NAME] \
   --repository-format=docker \
   --location=us-central1 \
   --description="Docker repository for TAG app"
 ```
 **Explanation:** Artifact Registry stores your Docker images so Cloud Run can access them.
 **Test:**
-Run `gcloud artifacts repositories list --location=us-central1` and confirm `spring2026-tag-repo` appears.
+Run `gcloud artifacts repositories list --location=us-central1` and confirm `[ARTIFACT_REGISTRY_REPO_NAME]` appears.
 **In Google Cloud Console:**
-- Go to "Artifact Registry > Repositories" and confirm `spring2026-tag-repo` is listed in the `us-central1` region.
+- Go to "Artifact Registry > Repositories" and confirm `[ARTIFACT_REGISTRY_REPO_NAME]` is listed in the `us-central1` region.
 
 ---
 
@@ -275,50 +315,37 @@ Run `gcloud artifacts repositories list --location=us-central1` and confirm `spr
 Build your Docker image and upload it to Artifact Registry so Cloud Run can deploy it:
 ```bash
 gcloud builds submit --region=global \
-  --tag us-central1-docker.pkg.dev/YOUR_PROJECT_ID/spring2026-tag-repo/tag-app
+  --tag us-central1-docker.pkg.dev/[PROJECT_ID]/[ARTIFACT_REGISTRY_REPO_NAME]/tag-app
 ```
 **Explanation:** This command builds your Docker image using the Dockerfile in your current directory and uploads it to Artifact Registry.
 **Test:**
-Run `gcloud artifacts docker images list us-central1-docker.pkg.dev/YOUR_PROJECT_ID/spring2026-tag-repo` and confirm your image appears.
+Run `gcloud artifacts docker images list us-central1-docker.pkg.dev/[PROJECT_ID]/[ARTIFACT_REGISTRY_REPO_NAME]` and confirm your image appears.
 **In Google Cloud Console:**
-- Go to "Artifact Registry > Repositories > spring2026-tag-repo" and click on the repository to see your image and tags.
+- Go to "Artifact Registry > Repositories > [ARTIFACT_REGISTRY_REPO_NAME]" and click on the repository to see your image and tags.
 
 
 ## Deploy to Cloud Run
 
-Deploy your Docker image as a managed service on Cloud Run, connecting it to Cloud SQL and using secrets:
+Deploy your Docker image as a managed service on Cloud Run, connecting it to Cloud SQL and using secrets.
+
 ```bash
-gcloud run deploy tag-app-service \
-  --image us-central1-docker.pkg.dev/YOUR_PROJECT_ID/spring2026-tag-repo/tag-app \
+gcloud run deploy [SERVICE_NAME] \
+  --image us-central1-docker.pkg.dev/[PROJECT_ID]/[ARTIFACT_REGISTRY_REPO_NAME]/tag-app \
   --region us-central1 \
   --platform managed \
-  --add-cloudsql-instances=YOUR_PROJECT_ID:us-central1:tag-app-db \
+  --add-cloudsql-instances=[PROJECT_ID]:us-central1:[DB_INSTANCE_NAME] \
   --set-env-vars=RAILS_ENV=production,RAILS_SERVE_STATIC_FILES=true \
-  --set-secrets=SECRET_KEY_BASE=secret-key-base:latest,DB_PASSWORD=db-password:latest \
+  --set-secrets=SECRET_KEY_BASE=[SECRET_KEY_NAME]:latest,DB_PASSWORD=[DB_PASSWORD_SECRET_NAME]:latest \
   --allow-unauthenticated
 ```
 
-## Run Database Migrations and Seeds (optional)
+**Test:**
+- Run `gcloud run services list --region=us-central1` and confirm `[SERVICE_NAME]` is listed with status `Active`.
 
-Set up your production database schema and seed data:
-```bash
-# If using Docker:
-docker run --rm -v $PWD:/app -w /app ruby:3.2.1-alpine \
-  sh -c "apk add --no-cache build-base postgresql-dev nodejs yarn && \
-         bundle install && \
-         RAILS_ENV=production DATABASE_URL=your_db_url_here bundle exec rails db:migrate db:seed"
-```
-
-
-## CI/CD Automation (Optional but Recommended)
-
-Automate build, push, and deploy steps using Cloud Build triggers.
-
-**How to set up:**
-1. Open Cloud Build in the Google Cloud Console.
-2. Create a trigger for your repository to run on push to `main`.
-3. Ensure your `cloudbuild.yaml` is present in the repo root.
-
+**In Google Cloud Console:**
+- Go to "Cloud Run" and confirm `[SERVICE_NAME]` is listed in the `[REGION]` region with a green checkmark.
+- Click on the service to view its details, URL, and logs.
+- Note the service URL (typically `https://[SERVICE_NAME]-xxxxx-uc.a.run.app`) and test it by opening it in your browser.
 
 ## Deployment is Complete!
 
@@ -329,12 +356,23 @@ Your app is now live on Cloud Run.
 
 Clean up all resources to avoid unnecessary charges:
 ```bash
-gcloud run services delete tag-app-service --region=us-central1
-gcloud sql instances delete tag-app-db --region=us-central1
-gcloud artifacts repositories delete spring2026-tag-repo --location=us-central1
-gcloud secrets delete secret-key-base
-gcloud secrets delete db-password
+gcloud run services delete [SERVICE_NAME] --region=us-central1
+gcloud sql instances delete [DB_INSTANCE_NAME] --region=us-central1
+gcloud artifacts repositories delete [ARTIFACT_REGISTRY_REPO_NAME] --location=us-central1
+gcloud secrets delete [SECRET_KEY_NAME]
+gcloud secrets delete [DB_PASSWORD_SECRET_NAME]
 ```
+
+# [Note to TA: Everything past this point is to be edited in Sprint 3]
+
+## CI/CD Automation (Optional but Recommended)
+
+Automate build, push, and deploy steps using Cloud Build triggers.
+
+**How to set up:**
+1. Open Cloud Build in the Google Cloud Console.
+2. Create a trigger for your repository to run on push to `main`.
+3. Ensure your `cloudbuild.yaml` is present in the repo root.
 
 ## 📎 Notes for the Future Teams
 

@@ -5,7 +5,7 @@
 
 * Team Contract: https://livememphis-my.sharepoint.com/:w:/g/personal/jlin8_memphis_edu/IQB3sMx-HenTSaUsp8y8DGxxAUND235XW6lOD3ulTUL1psY?e=QdDQ4u
 
-* Client Meeting Notes: [https://docs.google.com/document/d/1zPfrdiE6hBqIzEtFx1Fwb6oAbib8PR-Zi7qnjcjqyOU/edit?usp=sharing](https://docs.google.com/document/d/1MBrhAsigjD1iNziOoJ8XKvB69SAu503-9WEMtYMG5Go/edit?usp=sharing)
+* Client Meeting Notes: https://docs.google.com/document/d/1MBrhAsigjD1iNziOoJ8XKvB69SAu503-9WEMtYMG5Go/edit?usp=sharing 
 
 * Demo Day PPT: [https://docs.google.com/presentation/d/1Gnah-IXV4ybTxAyrbFVIyZ75tz5Z7EQ-3fq6GxYqwBk/edit?usp=sharing]
   

@@ -183,8 +183,15 @@ class GithubService
     variables = { org: org, number: number }
 
     begin
-      result = @client.post "graphql", { query: query, variables: variables }.to_json
+      result = @client.post("graphql", { query: query, variables: variables }.to_json)
       project = result.dig(:data, :organization, :projectV2)
+
+      if project.blank?
+        user_query = query.gsub("organization(login: $org)", "user(login: $org)")
+        user_result = @client.post("graphql", { query: user_query, variables: variables }.to_json)
+        project = user_result.dig(:data, :user, :projectV2)
+      end
+
       unless project
         @logger.warn("No project found or access denied for #{project_url}")
         return BoardHealth.new([], [], false, [])
@@ -265,6 +272,41 @@ class GithubService
     return assignee_counts
   end
 
+  def commit_metrics_by_user(repo, start_date, end_date)
+    return {} unless @client
+
+    commits = commits_in_range(repo, start_date, end_date)
+    metrics = Hash.new { |hash, key| hash[key] = { commit_count: 0, lines_added: 0, lines_removed: 0 } }
+
+    commits.each do |commit|
+      username = commit.author&.login || commit.commit&.author&.name
+      next if username.blank?
+
+      details = @client.commit(repo, commit.sha)
+      added = details.stats&.additions.to_i
+      removed = details.stats&.deletions.to_i
+
+      data = metrics[username]
+      data[:commit_count] += 1
+      data[:lines_added] += added
+      data[:lines_removed] += removed
+    rescue Octokit::NotFound
+      next
+    end
+
+    metrics.transform_values do |value|
+      CBPResult.new(
+        value[:commit_count],
+        value[:lines_added],
+        value[:lines_removed],
+        value[:lines_added] + value[:lines_removed]
+      )
+    end
+  rescue StandardError => e
+    @logger.error("Commit aggregate query failed for #{repo}: #{e.class} - #{e.message}")
+    {}
+  end
+
   # CBP: Count of commits and line changes
   def get_commit_info(repo, username, start_date, end_date)
     return CBPResult.new(0, 0, 0, 0) unless @client
@@ -316,10 +358,15 @@ class GithubService
   def parse_project_url(project_url)
     return [nil, nil] if project_url.blank?
 
-    match = project_url.match(%r{github\.com/orgs/([^/]+)/projects/(\d+)}i)
-    return [nil, nil] unless match
+    normalized = project_url.to_s.strip
 
-    [match[1], match[2].to_i]
+    org_match = normalized.match(%r{github\.com/orgs/([^/]+)/projects/(\d+)}i)
+    return [org_match[1], org_match[2].to_i] if org_match
+
+    user_match = normalized.match(%r{github\.com/users/([^/]+)/projects/(\d+)}i)
+    return [user_match[1], user_match[2].to_i] if user_match
+
+    [nil, nil]
   end
 
   def build_card(item)

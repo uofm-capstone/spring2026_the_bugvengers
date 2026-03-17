@@ -337,18 +337,43 @@ def status
     end
 
     @repos = current_user.repositories
-    @sprints = @semester.sprints
+    @sprints = @semester.sprints.order(:start_date)
     @start_dates, @end_dates, @team_names, @repo_owners, @repo_names, @access_tokens, @sprint_numbers = get_git_info(@semester)
 
     # Calculate metrics for display.
-    @service = GithubService.new
+    @service = GithubService.new(user: current_user)
 
     @team_project_data = {}
+    @team_board_health = {}
+    @status_metrics = {}
+
     @teams.each do |team|
-      project_cards = @service.project_cards(team.project_board_url)
-      @team_project_data[team.name] = project_cards
+      team_service = GithubService.new(team: team, user: current_user)
+      board_health = team_service.board_health(team.project_board_url)
+      project_cards = board_health.cards
+
+      @team_project_data[team.id] = project_cards
+      @team_board_health[team.id] = board_health
+      @status_metrics[team.id] = {}
+
+      repo_full_name = resolve_team_repo_full_name(team)
+
+      team.students.each do |student|
+        @status_metrics[team.id][student.id] = {}
+
+        @sprints.each do |sprint|
+          @status_metrics[team.id][student.id][sprint.name] = build_live_status_metrics(
+            service: team_service,
+            team_cards: project_cards,
+            board_health: board_health,
+            student: student,
+            sprint: sprint,
+            repo_full_name: repo_full_name
+          )
+        end
+      end
     end
-    
+
     render :show
 end
 
@@ -444,6 +469,64 @@ end
   # --------------------------------------------------------
 
   private
+
+  def build_live_status_metrics(service:, team_cards:, board_health:, student:, sprint:, repo_full_name:)
+    cbp = if repo_full_name.present? && student.github_username.present?
+      service.get_commit_info(repo_full_name, student.github_username, sprint.start_date, sprint.end_date)
+    else
+      GithubService::CBPResult.new(0, 0, 0, 0)
+    end
+
+    progress_check_start = sprint.progress_deadline&.beginning_of_day || sprint.start_date
+    tsp_commit = if repo_full_name.present? && student.github_username.present?
+      service.get_commit_info(repo_full_name, student.github_username, progress_check_start, sprint.end_date)
+    else
+      GithubService::CBPResult.new(0, 0, 0, 0)
+    end
+
+    stale_assigned_cards = board_health.stale_cards.count do |card|
+      card.assignees.include?(student.github_username)
+    end
+
+    columns = service.get_card_count_per_column(team_cards)
+    completed_count = columns["Done"] + columns["Archived"]
+    total_count = columns.values.sum
+
+    {
+      ku: {
+        archived_column_exists: board_health.archived_column_exists,
+        stale_team_tasks: board_health.stale_cards.count
+      },
+      pp: {
+        completed_cards: completed_count,
+        total_cards: total_count
+      },
+      cbp: cbp,
+      tsp: {
+        commit_count_since_progress: tsp_commit.commit_count,
+        lines_changed_since_progress: tsp_commit.lines_changed,
+        stale_assigned_tasks: stale_assigned_cards
+      }
+    }
+  end
+
+  def resolve_team_repo_full_name(team)
+    parsed_repo = @service.parse_repo_url(team.repo_url)
+    return parsed_repo if parsed_repo.present?
+
+    repository = @semester.repositories.find_by(team_id: team.id)
+    repository ||= @semester.repositories.find_by(team: team.name)
+
+    if repository&.owner.present? && repository&.repo_name.present?
+      return "#{repository.owner}/#{repository.repo_name}"
+    end
+
+    csv_owner = @repo_owners[team.name]
+    csv_repo = @repo_names[team.name]
+    return nil if csv_owner.blank? || csv_repo.blank?
+
+    "#{csv_owner}/#{csv_repo}"
+  end
 
   def parse_date(value)
     value.present? ? Date.parse(value) : nil

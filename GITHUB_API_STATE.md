@@ -85,3 +85,97 @@ There are multiple parallel GitHub access patterns in the codebase (server-side 
 - No explicit "touched board" metric is implemented.
 - Status-page KU metric currently renders as N/A placeholder in `app/views/semesters/show.html.erb`.
 - Available board data from GraphQL cards (status transitions/history) is not currently used to infer user board activity.
+
+## Database + Model Structure (Team/User/Sprint/GitHub-relevant)
+
+### Tables (from `db/schema.rb`)
+- `users`
+  - `github_token` (string): user-level token currently used by legacy HTTParty flow.
+  - `role`, `admin`, auth fields.
+- `teams`
+  - `semester_id` (required FK).
+  - `github_token` (string): team-level token field exists.
+  - `repo_url`, `project_board_url`, `timesheet_url`, `client_notes_url`.
+- `students`
+  - `semester_id` FK.
+  - `github_username`.
+  - legacy fields `team_id`, `team_name`, plus URL fields.
+- `sprints`
+  - `semester_id` FK.
+  - `start_date`, `end_date`, plus `planning_deadline`, `progress_deadline`, `demo_deadline`.
+- `repositories`
+  - `owner`, `repo_name`, `team` text field.
+  - `user_id` required FK.
+  - `semester_id`, `team_id` optional in schema.
+
+### Model relationships and notable constraints
+- `Semester`:
+  - `belongs_to :user`.
+  - `has_many :sprints`, `:teams`, `:students`, `:repositories`.
+  - Uses ActiveStorage attachments `student_csv`, `git_csv`, `client_csv`.
+- `Team`:
+  - `belongs_to :semester`.
+  - `has_many :students, through: :student_teams`.
+  - stores `project_board_url` that drives status-page GraphQL pull.
+- `Student`:
+  - `belongs_to :semester`.
+  - has `github_username` used to map per-user metrics in status table.
+- `Sprint`:
+  - `belongs_to :semester`; validates name/start/end.
+- `Repository`:
+  - `belongs_to :user`.
+  - `belongs_to :semester, optional: true`.
+  - `belongs_to :team, optional: false` in model, but `team_id` is nullable in schema (model/schema mismatch risk).
+
+## Hardcoded / Fragile Areas
+
+1. Hardcoded sprint window in legacy API controller.
+- `Semesters::RepositoriesController#show` sets fixed dates to Jan-Mar 2025 instead of using `Sprint` records.
+
+2. Token source fragmentation.
+- `ENV["GITHUB_PAT"]` for `GithubService`.
+- `current_user.github_token` for HTTParty controller.
+- CSV-provided token in hidden HTML input for browser Octokit.
+- `teams.github_token` exists but is not a unified source of truth.
+
+3. Sensitive token exposure in UI/data pipeline.
+- Team token values are rendered in `app/views/teams/index.html.erb`.
+- Browser flow injects token into hidden DOM fields.
+
+4. Status-page metrics partially hardcoded placeholders.
+- KU/TS/CC/SR/PF/D render fixed N/A indicators.
+- PP/CBP/TSP currently render static "OK" icon, not computed metrics.
+
+5. Incomplete status integration for commit metrics.
+- `GithubService#get_commit_info` exists but status page does not call it for CBP cells.
+
+6. Project URL parsing assumptions.
+- `project_cards` assumes URL shape where org is segment 5 and project number is segment 7.
+
+7. Potential nil-safety gaps.
+- `status` loops over `team.project_board_url` without guardrails for missing/invalid URLs.
+
+## Refactor Priorities For Status Page GitHub API Work
+
+1. Unify token strategy server-side.
+- Choose one secure credential source and remove browser-token pattern + duplicated token columns where possible.
+
+2. Route GitHub calls through service objects only.
+- Consolidate HTTParty legacy logic into `GithubService` (or dedicated GitHub clients).
+
+3. Replace hardcoded sprint dates with DB-backed sprint windows.
+- Use `Sprint.start_date/end_date` or sprint deadlines from semester context.
+
+4. Implement real KU/CBP/TSP computations.
+- KU: infer board interaction from card events/updated timestamps or timeline APIs.
+- CBP: wire `get_commit_info` into status table per student/sprint.
+- TSP: define and compute from commit + board/task activity since progress check date.
+
+5. Normalize repository ownership mapping.
+- Prefer `repositories.team_id` / `owner` / `repo_name` from DB over `git_csv` for runtime API calls.
+
+6. Add robust error handling and observability.
+- Replace `puts` with structured Rails logging and surfaced error states in UI.
+
+## Summary
+The status page already has a partial GitHub foundation (ProjectV2 GraphQL cards via `GithubService`) but still depends on CSV-driven/browser-side token usage and several placeholder metrics. Core next step is to consolidate token + API access server-side and wire real sprint-aware computed metrics into the status grid.

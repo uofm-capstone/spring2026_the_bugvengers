@@ -36,6 +36,8 @@ class User < ApplicationRecord
   inverse_of: :user,
   dependent: :destroy
 
+  has_one :student, dependent: :nullify
+
   # Joint table with Team
   # has_many :user_teams, dependent: :destroy
   # has_many :teams, through: :user_teams

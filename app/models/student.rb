@@ -2,6 +2,7 @@
 class Student < ApplicationRecord
   # Associations
   belongs_to :semester, optional: true  # Students belong to a semester
+  belongs_to :user, optional: true # Students belong to a user
   has_many :student_teams, dependent: :destroy
   has_many :teams, through: :student_teams
 

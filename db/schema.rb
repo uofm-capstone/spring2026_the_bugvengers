@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.0].define(version: 2025_11_11_034519) do
+ActiveRecord::Schema[7.0].define(version: 2026_03_19_201204) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -110,8 +110,10 @@ ActiveRecord::Schema[7.0].define(version: 2025_11_11_034519) do
     t.string "timesheet_url"
     t.string "client_notes_url"
     t.bigint "semester_id"
+    t.bigint "user_id"
     t.index ["semester_id"], name: "index_students_on_semester_id"
     t.index ["team_id", "github_username"], name: "index_students_on_team_id_and_github_username", unique: true
+    t.index ["user_id"], name: "index_students_on_user_id"
   end
 
   create_table "teams", force: :cascade do |t|
@@ -139,6 +141,8 @@ ActiveRecord::Schema[7.0].define(version: 2025_11_11_034519) do
     t.string "github_token"
     t.boolean "admin", default: false
     t.integer "role", default: 0
+    t.boolean "is_active", default: false, null: false
+    t.boolean "temp_password_changed", default: false, null: false
     t.index ["email"], name: "index_users_on_email", unique: true
     t.index ["reset_password_token"], name: "index_users_on_reset_password_token", unique: true
   end
@@ -155,5 +159,6 @@ ActiveRecord::Schema[7.0].define(version: 2025_11_11_034519) do
   add_foreign_key "student_teams", "students"
   add_foreign_key "student_teams", "teams"
   add_foreign_key "students", "semesters"
+  add_foreign_key "students", "users"
   add_foreign_key "teams", "semesters"
 end

@@ -10,3 +10,4 @@ config/master.key
 .env*
 .env
 config/credentials.yml.enc
+/tmp/pids/server.pid

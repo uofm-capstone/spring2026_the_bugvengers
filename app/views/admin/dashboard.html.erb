@@ -22,6 +22,7 @@
           <th>Email</th>
           <th>Role</th>
           <th>Actions</th>
+          <th>Last Logged In</th>
         </tr>
       </thead>
       <tbody class="text-center">
@@ -58,6 +59,9 @@
                   <% end %>
                 <% end %>
               </div>
+            </td>
+            <td>
+              <%= user.last_login_at ? user.last_login_at.strftime("%Y-%m-%d %H:%M") : "Never" %>
             </td>
           </tr>
         <% end %>

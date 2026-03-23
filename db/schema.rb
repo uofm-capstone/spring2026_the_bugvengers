@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.0].define(version: 2025_11_11_034519) do
+ActiveRecord::Schema[7.0].define(version: 2026_03_23_174312) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -76,6 +76,22 @@ ActiveRecord::Schema[7.0].define(version: 2025_11_11_034519) do
     t.index ["user_id"], name: "index_semesters_on_user_id"
   end
 
+  create_table "sprint_rubric_scores", force: :cascade do |t|
+    t.bigint "semester_id", null: false
+    t.bigint "sprint_id", null: false
+    t.bigint "team_id", null: false
+    t.bigint "student_id", null: false
+    t.string "item"
+    t.integer "value"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["semester_id", "sprint_id", "team_id", "student_id", "item"], name: "idx_unique_sprint_rubric", unique: true
+    t.index ["semester_id"], name: "index_sprint_rubric_scores_on_semester_id"
+    t.index ["sprint_id"], name: "index_sprint_rubric_scores_on_sprint_id"
+    t.index ["student_id"], name: "index_sprint_rubric_scores_on_student_id"
+    t.index ["team_id"], name: "index_sprint_rubric_scores_on_team_id"
+  end
+
   create_table "sprints", force: :cascade do |t|
     t.datetime "start_date", precision: nil
     t.datetime "end_date", precision: nil
@@ -139,6 +155,7 @@ ActiveRecord::Schema[7.0].define(version: 2025_11_11_034519) do
     t.string "github_token"
     t.boolean "admin", default: false
     t.integer "role", default: 0
+    t.datetime "last_login_at"
     t.index ["email"], name: "index_users_on_email", unique: true
     t.index ["reset_password_token"], name: "index_users_on_reset_password_token", unique: true
   end
@@ -151,6 +168,10 @@ ActiveRecord::Schema[7.0].define(version: 2025_11_11_034519) do
   add_foreign_key "repositories", "teams"
   add_foreign_key "repositories", "users"
   add_foreign_key "semesters", "users"
+  add_foreign_key "sprint_rubric_scores", "semesters"
+  add_foreign_key "sprint_rubric_scores", "sprints"
+  add_foreign_key "sprint_rubric_scores", "students"
+  add_foreign_key "sprint_rubric_scores", "teams"
   add_foreign_key "sprints", "semesters"
   add_foreign_key "student_teams", "students"
   add_foreign_key "student_teams", "teams"

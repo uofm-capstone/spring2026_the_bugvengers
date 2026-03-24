@@ -651,6 +651,24 @@ def import_students_from_csv
           end
 
           student = existing_student
+
+          # Create login account if student existed before account existed
+          if student.user.nil? && !User.exists?(email: email)
+            temp_password = SecureRandom.alphanumeric(10)
+            user = User.new(
+              email: email,
+              password: temp_password,
+              password_confirmation: temp_password,
+              role: :student,
+              is_active: false,
+              temp_password_changed: false      
+            )
+            if user.save
+              student.update!(user: user)
+            else
+              row_errors << "Row #{i + 2}: Login account creation failed — #{user.errors.full_messages.join(', ')}"
+            end
+          end
         else
           # CREATE new student
           student = students.create!(
@@ -664,6 +682,24 @@ def import_students_from_csv
             semester: self
           )
           created_count += 1
+
+          # Create login account if no User account exists
+          unless User.exists?(email: email)
+            temp_password = SecureRandom.alphanumeric(10)
+            user = User.new(
+              email: email,
+              password: temp_password,
+              password_confirmation: temp_password,
+              role: :student,
+              is_active: false,
+              temp_password_changed: false
+            )
+            if user.save
+              student.update!(user: user)
+            else
+              row_errors << "Row #{i + 2}: Login account creation failed - #{user.errors.full_messages.join(',')}"
+            end
+          end
         end
 
         # Link student to team (no duplicates)

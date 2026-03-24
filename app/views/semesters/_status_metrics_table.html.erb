@@ -56,13 +56,14 @@
       <% teams.each do |team| %>
         <% team_summary = team_overview_by_id[team.id] || {} %>
         <% team.students.each_with_index do |student, i| %>
+          <% student_metric_by_sprint = status_metrics.dig(team.id, student.id) || {} %>
           <tr
             data-team-filter="1"
             data-team-id="<%= team.id %>"
             data-at-risk="<%= team_summary[:any_at_risk] %>"
             data-missing-done="<%= team_summary[:any_missing_sprint_done] %>">
             <% if i == 0 %>
-              <td class="sticky-col-1" rowspan="<%= team.students.size %>">
+              <td class="sticky-col-1" rowspan="<%= team.students.size + 1 %>">
                 <div class="sticky-cell">
                   <%= link_to team.name, teams_path(semester), class: "text-decoration-none fw-semibold" %>
                   <% if team_summary[:any_at_risk] %>
@@ -80,35 +81,28 @@
 
             <% sprint_list.each do |sprint| %>
               <% rubric_items.each do |item| %>
+                <% metric = student_metric_by_sprint[sprint] || {} %>
                 <td class="text-center sprint-group <%= sprint.parameterize %>">
                   <% case item %>
                     <% when "FS&D" %>
-                      <% if !team_project_data.nil? %>
-                        <% column_count = service.get_card_count_per_column(team_project_data[team.id]) %>
-                        <%= "#{column_count['Backlog']}, #{column_count['Todo']}, #{column_count['In Progress']}, #{column_count['Done']}" %>
-                      <% end %>
+                      <% fsd = metric[:fsd] || {} %>
+                      <%= "#{fsd[:backlog] || 0}, #{fsd[:todo] || 0}, #{fsd[:in_progress] || 0}, #{fsd[:done] || 0}" %>
                     <% when "FA" %>
-                      <% if !team_project_data.nil? %>
-                        <% assigned_count = service.get_card_count_per_assignee(team_project_data[team.id], student.github_username)[student.github_username] %>
-                        <%= assigned_count %>
-                      <% end %>
+                      <%= metric.dig(:fa, :assigned_cards) || 0 %>
                     <% when "TE" %>
-                      <% if !team_project_data.nil? %>
-                        <% estimated_hours = service.get_total_hours_per_assignee(team_project_data[team.id], student.github_username)[student.github_username] %>
-                        <%= estimated_hours %>
-                      <% end %>
+                      <%= metric.dig(:te, :estimated_hours) || 0 %>
                     <% when "KU" %>
-                      <% metric = team_sprint_metrics.dig(team.id, sprint) || {} %>
+                      <% team_metric = team_sprint_metrics.dig(team.id, sprint) || {} %>
                       <div class="status-metric-stack">
-                        <span><strong>Archived:</strong> <%= metric[:archived_column_exists] ? 'Yes' : 'No' %></span>
-                        <span><strong>Active:</strong> <%= metric[:active_now_cards] || 0 %></span>
+                        <span><strong>Archived:</strong> <%= team_metric[:archived_column_exists] ? 'Yes' : 'No' %></span>
+                        <span><strong>Active:</strong> <%= team_metric[:active_now_cards] || 0 %></span>
                       </div>
                     <% when "PP" %>
-                      <% metric = team_sprint_metrics.dig(team.id, sprint) || {} %>
+                      <% team_metric = team_sprint_metrics.dig(team.id, sprint) || {} %>
                       <div class="status-metric-stack">
-                        <span><strong>Board Done:</strong> <%= metric[:current_board_done_cards] || 0 %></span>
-                        <span><strong><%= sprint %>:</strong> <%= metric[:sprint_done_cards] || 0 %></span>
-                        <span><strong>Total:</strong> <%= metric[:total_cards] || 0 %></span>
+                        <span><strong>Board Done:</strong> <%= team_metric[:current_board_done_cards] || 0 %></span>
+                        <span><strong><%= sprint %>:</strong> <%= team_metric[:sprint_done_cards] || 0 %></span>
+                        <span><strong>Total:</strong> <%= team_metric[:total_cards] || 0 %></span>
                       </div>
 
                     <% when "CBP" %>
@@ -119,11 +113,11 @@
                       </div>
 
                     <% when "TSP" %>
-                      <% metric = status_metrics.dig(team.id, student.id, sprint, :tsp) || {} %>
+                      <% tsp = metric[:tsp] || {} %>
                       <div class="status-metric-stack">
-                        <span><strong>Commits:</strong> <%= metric[:commit_count_since_progress] || 0 %></span>
-                        <span><strong>LOC:</strong> <%= metric[:lines_changed_since_progress] || 0 %></span>
-                        <span><strong>Stale:</strong> <%= metric[:stale_assigned_tasks] || 0 %></span>
+                        <span><strong>Commits:</strong> <%= tsp[:commit_count_since_progress] || 0 %></span>
+                        <span><strong>LOC:</strong> <%= tsp[:lines_changed_since_progress] || 0 %></span>
+                        <span><strong>Stale:</strong> <%= tsp[:stale_assigned_tasks] || 0 %></span>
                       </div>
 
                     <% when "TS", "CC", "SR", "PF", "D" %>
@@ -141,6 +135,41 @@
             <% end %>
           </tr>
         <% end %>
+
+        <tr
+          class="team-total-row"
+          data-team-filter="1"
+          data-team-id="<%= team.id %>"
+          data-at-risk="<%= team_summary[:any_at_risk] %>"
+          data-missing-done="<%= team_summary[:any_missing_sprint_done] %>">
+          <td class="sticky-col-2"><strong>Total</strong></td>
+
+          <% sprint_list.each do |sprint| %>
+            <% rubric_items.each do |item| %>
+              <% team_metric = team_sprint_metrics.dig(team.id, sprint) || {} %>
+              <td class="text-center sprint-group <%= sprint.parameterize %>">
+                <% case item %>
+                  <% when "FS&D" %>
+                    <strong><%= "#{team_metric[:backlog_cards] || 0}, #{team_metric[:todo_cards] || 0}, #{team_metric[:in_progress_cards] || 0}, #{team_metric[:done_cards] || 0}" %></strong>
+                  <% when "FA" %>
+                    <strong><%= team.students.sum { |s| status_metrics.dig(team.id, s.id, sprint, :fa, :assigned_cards).to_i } %></strong>
+                  <% when "TE" %>
+                    <strong><%= team.students.sum { |s| status_metrics.dig(team.id, s.id, sprint, :te, :estimated_hours).to_f }.round(1) %></strong>
+                  <% when "CBP" %>
+                    <strong>Commits: <%= team.students.sum { |s| status_metrics.dig(team.id, s.id, sprint, :cbp)&.commit_count.to_i } %> | LOC: <%= team.students.sum { |s| status_metrics.dig(team.id, s.id, sprint, :cbp)&.lines_changed.to_i } %></strong>
+                  <% when "TSP" %>
+                    <strong>Commits: <%= team.students.sum { |s| status_metrics.dig(team.id, s.id, sprint, :tsp, :commit_count_since_progress).to_i } %> | LOC: <%= team.students.sum { |s| status_metrics.dig(team.id, s.id, sprint, :tsp, :lines_changed_since_progress).to_i } %></strong>
+                  <% when "KU" %>
+                    <strong>Archived: <%= team_metric[:archived_column_exists] ? 'Yes' : 'No' %> | Active: <%= team_metric[:active_now_cards] || 0 %></strong>
+                  <% when "PP" %>
+                    <strong>Done: <%= team_metric[:current_board_done_cards] || 0 %> | <%= sprint %>: <%= team_metric[:sprint_done_cards] || 0 %></strong>
+                  <% else %>
+                    <span>-</span>
+                <% end %>
+              </td>
+            <% end %>
+          <% end %>
+        </tr>
       <% end %>
     </tbody>
   </table>

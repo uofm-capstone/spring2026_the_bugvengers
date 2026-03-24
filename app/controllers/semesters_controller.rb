@@ -354,6 +354,7 @@ def status
       team_service = GithubService.new(team: team, user: current_user)
       board_health = team_service.board_health(team.project_board_url)
       project_cards = board_health.cards
+      sprint_cards_by_name = {}
 
       @team_project_data[team.id] = project_cards
       @team_board_health[team.id] = board_health
@@ -366,6 +367,9 @@ def status
       inspector_sprints = {}
 
       @sprints.each do |sprint|
+        sprint_cards = cards_for_sprint(project_cards, sprint)
+        sprint_cards_by_name[sprint.name] = sprint_cards
+
         if repo_full_name.present?
           sprint_commit_metrics[sprint.name] = team_service.commit_metrics_by_user(repo_full_name, sprint.start_date, sprint.end_date)
           progress_check_start = sprint.progress_deadline&.beginning_of_day || sprint.start_date
@@ -376,7 +380,7 @@ def status
         end
 
         team_metric = build_team_sprint_metrics(
-          team_cards: project_cards,
+          sprint_cards: sprint_cards,
           board_health: board_health,
           sprint: sprint,
           sprint_commit_metric_map: sprint_commit_metrics[sprint.name],
@@ -399,7 +403,7 @@ def status
 
         @sprints.each do |sprint|
           @status_metrics[team.id][student.id][sprint.name] = build_live_status_metrics(
-            team_cards: project_cards,
+            sprint_cards: sprint_cards_by_name[sprint.name],
             board_health: board_health,
             student: student,
             sprint: sprint,
@@ -526,7 +530,7 @@ end
 
   private
 
-  def build_live_status_metrics(team_cards:, board_health:, student:, sprint:, sprint_commit_metrics:, sprint_progress_metrics:)
+  def build_live_status_metrics(sprint_cards:, board_health:, student:, sprint:, sprint_commit_metrics:, sprint_progress_metrics:)
     cbp = cbp_metric_for_user(sprint_commit_metrics[sprint.name], student.github_username)
     tsp_commit = cbp_metric_for_user(sprint_progress_metrics[sprint.name], student.github_username)
 
@@ -534,15 +538,40 @@ end
       card.assignees.include?(student.github_username)
     end
 
-    columns = @service.get_card_count_per_column(team_cards)
-    sprint_done_count = team_cards.count { |card| done_in_sprint_status?(card.status, sprint.name) }
-    done_in_any_sprint_count = team_cards.count { |card| done_in_any_sprint_status?(card.status) }
+    columns = @service.get_card_count_per_column(sprint_cards)
+    sprint_done_count = sprint_cards.count { |card| done_in_sprint_status?(card.status, sprint.name) }
+    done_in_any_sprint_count = sprint_cards.count { |card| done_in_any_sprint_status?(card.status) }
     current_board_done_count = columns["Done"]
     archived_count = columns["Archived"]
     active_now_count = columns["Backlog"] + columns["Todo"] + columns["To Do"] + columns["In Progress"]
     total_count = columns.values.sum
 
+    per_student_column_counts = Hash.new(0)
+    assigned_card_count = 0
+    estimated_hours = 0
+
+    sprint_cards.each do |card|
+      next unless card.assignees.include?(student.github_username)
+
+      assigned_card_count += 1
+      status = card.status || "Unspecified"
+      per_student_column_counts[status] += 1
+      estimated_hours += card.fields["Time Estimate"].to_f
+    end
+
     {
+      fsd: {
+        backlog: per_student_column_counts["Backlog"],
+        todo: per_student_column_counts["Todo"] + per_student_column_counts["To Do"],
+        in_progress: per_student_column_counts["In Progress"],
+        done: per_student_column_counts["Done"] + per_student_column_counts["Archived"] + per_student_column_counts["Done in Sprint #{sprint.name.to_s[/\d+/]}"]
+      },
+      fa: {
+        assigned_cards: assigned_card_count
+      },
+      te: {
+        estimated_hours: estimated_hours.round(1)
+      },
       ku: {
         archived_column_exists: board_health.archived_column_exists,
         stale_team_tasks: board_health.stale_cards.count
@@ -564,10 +593,10 @@ end
     }
   end
 
-  def build_team_sprint_metrics(team_cards:, board_health:, sprint:, sprint_commit_metric_map:, students:)
-    columns = @service.get_card_count_per_column(team_cards)
-    sprint_done_count = team_cards.count { |card| done_in_sprint_status?(card.status, sprint.name) }
-    done_in_any_sprint_count = team_cards.count { |card| done_in_any_sprint_status?(card.status) }
+  def build_team_sprint_metrics(sprint_cards:, board_health:, sprint:, sprint_commit_metric_map:, students:)
+    columns = @service.get_card_count_per_column(sprint_cards)
+    sprint_done_count = sprint_cards.count { |card| done_in_sprint_status?(card.status, sprint.name) }
+    done_in_any_sprint_count = sprint_cards.count { |card| done_in_any_sprint_status?(card.status) }
     current_board_done_count = columns["Done"]
     archived_count = columns["Archived"]
     active_now_count = columns["Backlog"] + columns["Todo"] + columns["To Do"] + columns["In Progress"]
@@ -589,6 +618,10 @@ end
     {
       sprint_name: sprint.name,
       archived_column_exists: board_health.archived_column_exists,
+      backlog_cards: columns["Backlog"],
+      todo_cards: columns["Todo"] + columns["To Do"],
+      in_progress_cards: columns["In Progress"],
+      done_cards: columns["Done"] + columns["Archived"],
       current_board_done_cards: current_board_done_count,
       sprint_done_cards: sprint_done_count,
       done_in_any_sprint_cards: done_in_any_sprint_count,
@@ -630,6 +663,32 @@ end
     return false if status.blank?
 
     status.to_s.strip.downcase.match?(/\Adone in sprint\s*\d+\z/)
+  end
+
+  def cards_for_sprint(cards, sprint)
+    matching_cards = cards.select { |card| card_matches_sprint?(card, sprint) }
+    return matching_cards if matching_cards.any?
+
+    cards.select do |card|
+      %w[Backlog Todo To\ Do In\ Progress Done Archived].include?(card.status.to_s)
+    end
+  end
+
+  def card_matches_sprint?(card, sprint)
+    return false if card.blank? || sprint.blank?
+
+    status = card.status.to_s
+    return true if done_in_sprint_status?(status, sprint.name)
+
+    sprint_number = sprint.name.to_s[/\d+/]
+    return false if sprint_number.blank?
+
+    card.fields.any? do |field_name, value|
+      next false unless field_name.to_s.match?(/sprint|iteration/i)
+
+      normalized = value.to_s.downcase
+      normalized.include?("sprint #{sprint_number}") || normalized == sprint_number
+    end
   end
 
   def resolve_team_repo_full_name(team)

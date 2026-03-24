@@ -415,6 +415,7 @@ def status
         students_count: team.students.count,
         any_at_risk: @team_sprint_metrics[team.id].values.any? { |metric| metric[:at_risk] },
         any_missing_sprint_done: @team_sprint_metrics[team.id].values.any? { |metric| metric[:missing_sprint_done] },
+        at_risk_reason_preview: @team_sprint_metrics[team.id].values.flat_map { |metric| metric[:at_risk_reasons] }.uniq.first(2),
         sprint_metrics: @team_sprint_metrics[team.id]
       }
 

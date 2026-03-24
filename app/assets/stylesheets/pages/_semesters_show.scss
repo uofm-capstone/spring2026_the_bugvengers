@@ -68,6 +68,17 @@
   font-size: 0.85rem;
 }
 
+.team-overview-risk {
+  color: #8a2415;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.team-overview-ok {
+  color: #2c6f43;
+  font-size: 0.78rem;
+}
+
 .team-overview-sprints {
   display: flex;
   flex-direction: column;
@@ -118,4 +129,23 @@
   gap: 8px;
   font-size: 0.82rem;
   padding: 2px 0;
+}
+
+.team-risk-badge {
+  display: inline-block;
+  margin-left: 8px;
+  font-size: 0.7rem;
+  color: #fff;
+  background: #b5392c;
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+
+.status-metric-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: left;
+  font-size: 0.78rem;
+  line-height: 1.25;
 }

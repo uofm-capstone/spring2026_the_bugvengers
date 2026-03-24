@@ -106,6 +106,11 @@
                     data-missing-done="<%= summary[:any_missing_sprint_done] %>">
                     <h5 class="team-overview-name mb-1"><%= summary[:team_name] %></h5>
                     <p class="team-overview-meta mb-2"><%= summary[:students_count] %> students</p>
+                    <% if summary[:any_at_risk] %>
+                      <p class="team-overview-risk mb-2">At risk: <%= summary[:at_risk_reason_preview].join(" | ") %></p>
+                    <% else %>
+                      <p class="team-overview-ok mb-2">No active TA flags for current data.</p>
+                    <% end %>
                     <div class="team-overview-sprints">
                       <% @sprint_list.each do |sprint| %>
                         <% sprint_metric = summary.dig(:sprint_metrics, sprint) || {} %>
@@ -209,6 +214,9 @@
                             <td class="sticky-col-1" rowspan="<%= team.students.size %>">
                               <div class="sticky-cell">
                                 <%= link_to team.name, teams_path(@semester), class: "text-decoration-none fw-semibold" %>
+                                <% if team_summary[:any_at_risk] %>
+                                  <span class="team-risk-badge">At Risk</span>
+                                <% end %>
                               </div>
                             </td>
                           <% end %>
@@ -243,18 +251,32 @@
                                     <% end %>
                                   <% when "KU" %>
                                     <% metric = @team_sprint_metrics.dig(team.id, sprint) || {} %>
-                                    <%= "Archived: #{metric[:archived_column_exists] ? 'Yes' : 'No'} | Active: #{metric[:active_now_cards] || 0}" %>
+                                    <div class="status-metric-stack">
+                                      <span><strong>Archived:</strong> <%= metric[:archived_column_exists] ? 'Yes' : 'No' %></span>
+                                      <span><strong>Active:</strong> <%= metric[:active_now_cards] || 0 %></span>
+                                    </div>
                                   <% when "PP" %>
                                     <% metric = @team_sprint_metrics.dig(team.id, sprint) || {} %>
-                                    <%= "Board Done: #{metric[:current_board_done_cards] || 0} | #{sprint}: #{metric[:sprint_done_cards] || 0} | Total: #{metric[:total_cards] || 0}" %>
+                                    <div class="status-metric-stack">
+                                      <span><strong>Board Done:</strong> <%= metric[:current_board_done_cards] || 0 %></span>
+                                      <span><strong><%= sprint %>:</strong> <%= metric[:sprint_done_cards] || 0 %></span>
+                                      <span><strong>Total:</strong> <%= metric[:total_cards] || 0 %></span>
+                                    </div>
 
                                   <% when "CBP" %>
                                     <% metric = @status_metrics.dig(team.id, student.id, sprint, :cbp) %>
-                                    <%= "Commits: #{metric&.commit_count || 0} | LOC: #{metric&.lines_changed || 0}" %>
+                                    <div class="status-metric-stack">
+                                      <span><strong>Commits:</strong> <%= metric&.commit_count || 0 %></span>
+                                      <span><strong>LOC:</strong> <%= metric&.lines_changed || 0 %></span>
+                                    </div>
 
                                   <% when "TSP" %>
                                     <% metric = @status_metrics.dig(team.id, student.id, sprint, :tsp) || {} %>
-                                    <%= "Commits: #{metric[:commit_count_since_progress] || 0} | LOC: #{metric[:lines_changed_since_progress] || 0} | Stale: #{metric[:stale_assigned_tasks] || 0}" %>
+                                    <div class="status-metric-stack">
+                                      <span><strong>Commits:</strong> <%= metric[:commit_count_since_progress] || 0 %></span>
+                                      <span><strong>LOC:</strong> <%= metric[:lines_changed_since_progress] || 0 %></span>
+                                      <span><strong>Stale:</strong> <%= metric[:stale_assigned_tasks] || 0 %></span>
+                                    </div>
 
                                   <% when "TS", "CC", "SR", "PF", "D" %>
                                     <!-- N/A metrics — Metric: Not applicable (no direct data collected) -->

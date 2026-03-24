@@ -424,7 +424,7 @@ end
         student_survey = studentData.find_all { |survey| survey[:q2] == team && survey[:q22] == sprint }
         flags.append("student blank") if student_survey.blank?
       end
-    rescue => e
+    rescue => _e
       flags.append("no data")
     end
     flags
@@ -492,7 +492,11 @@ end
     end
 
     columns = @service.get_card_count_per_column(team_cards)
-    completed_count = columns["Done"] + columns["Archived"]
+    sprint_done_count = team_cards.count { |card| done_in_sprint_status?(card.status, sprint.name) }
+    done_in_any_sprint_count = team_cards.count { |card| done_in_any_sprint_status?(card.status) }
+    current_board_done_count = columns["Done"]
+    archived_count = columns["Archived"]
+    active_now_count = columns["Backlog"] + columns["Todo"] + columns["To Do"] + columns["In Progress"]
     total_count = columns.values.sum
 
     {
@@ -501,7 +505,11 @@ end
         stale_team_tasks: board_health.stale_cards.count
       },
       pp: {
-        completed_cards: completed_count,
+        current_board_done_cards: current_board_done_count,
+        sprint_done_cards: sprint_done_count,
+        done_in_any_sprint_cards: done_in_any_sprint_count,
+        archived_cards: archived_count,
+        active_now_cards: active_now_count,
         total_cards: total_count
       },
       cbp: cbp,
@@ -524,6 +532,22 @@ end
     end
 
     GithubService::CBPResult.new(0, 0, 0, 0)
+  end
+
+  def done_in_sprint_status?(status, sprint_name)
+    return false if status.blank? || sprint_name.blank?
+
+    sprint_number = sprint_name.to_s[/\d+/]
+    return false if sprint_number.blank?
+
+    normalized = status.to_s.strip.downcase
+    normalized.match?(/\Adone in sprint\s*#{Regexp.escape(sprint_number)}\z/)
+  end
+
+  def done_in_any_sprint_status?(status)
+    return false if status.blank?
+
+    status.to_s.strip.downcase.match?(/\Adone in sprint\s*\d+\z/)
   end
 
   def resolve_team_repo_full_name(team)

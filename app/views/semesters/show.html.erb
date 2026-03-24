@@ -120,7 +120,7 @@
                             when "TE"   then "<strong>Feature Time Estimates</strong><br><b>Metric:</b> Sum of estimated hours per team member."
                             when "KU"   then "<strong>Kanban Updates</strong><br><b>Metric:</b> N/A."
                             when "TS"   then "<strong>Time Spent</strong><br><b>Metric:</b> N/A."
-                            when "PP"   then "<strong>Product Progress</strong><br><b>Metric:</b> Cards moved through workflow (To-Do → In-Progress → Done)."
+                            when "PP"   then "<strong>Product Progress</strong><br><b>Metric:</b> Distinguishes current board Done from Done in this sprint column."
                             when "CC"   then "<strong>Client Communication</strong><br><b>Metric:</b> N/A."
                             when "CBP"  then "<strong>Coding Best Practices</strong><br><b>Metric:</b> Count of commits and line changes."
                             when "SR"   then "<strong>Status and Reflection</strong><br><b>Metric:</b> N/A."
@@ -189,7 +189,7 @@
                                     <%= "Archived: #{metric[:archived_column_exists] ? 'Yes' : 'No'} | Stale: #{metric[:stale_team_tasks] || 0}" %>
                                   <% when "PP" %>
                                     <% metric = @status_metrics.dig(team.id, student.id, sprint, :pp) || {} %>
-                                    <%= "#{metric[:completed_cards] || 0}/#{metric[:total_cards] || 0}" %>
+                                    <%= "Board Done: #{metric[:current_board_done_cards] || 0} | #{sprint}: #{metric[:sprint_done_cards] || 0} | Active: #{metric[:active_now_cards] || 0}" %>
 
                                   <% when "CBP" %>
                                     <% metric = @status_metrics.dig(team.id, student.id, sprint, :cbp) %>

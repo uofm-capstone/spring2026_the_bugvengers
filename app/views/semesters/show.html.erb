@@ -90,6 +90,58 @@
                 <% end %>
               </div>
 
+              <div class="d-flex flex-wrap justify-content-center gap-2 mb-3">
+                <button class="btn btn-sm btn-outline-secondary team-filter active" data-filter="all">All Teams</button>
+                <button class="btn btn-sm btn-outline-danger team-filter" data-filter="at-risk">At-Risk Teams</button>
+                <button class="btn btn-sm btn-outline-warning team-filter" data-filter="missing-done">Missing Done In Sprint</button>
+              </div>
+
+              <div class="team-overview-grid mb-4">
+                <% @team_status_overview.each do |summary| %>
+                  <article
+                    class="team-overview-card"
+                    data-team-card="1"
+                    data-team-id="<%= summary[:team_id] %>"
+                    data-at-risk="<%= summary[:any_at_risk] %>"
+                    data-missing-done="<%= summary[:any_missing_sprint_done] %>">
+                    <h5 class="team-overview-name mb-1"><%= summary[:team_name] %></h5>
+                    <p class="team-overview-meta mb-2"><%= summary[:students_count] %> students</p>
+                    <div class="team-overview-sprints">
+                      <% @sprint_list.each do |sprint| %>
+                        <% sprint_metric = summary.dig(:sprint_metrics, sprint) || {} %>
+                        <div class="team-overview-sprint-pill <%= sprint_metric[:at_risk] ? 'is-risk' : 'is-healthy' %>">
+                          <strong><%= sprint %></strong>
+                          <span>Done: <%= sprint_metric[:sprint_done_cards] || 0 %></span>
+                          <span>Commits: <%= sprint_metric[:team_commit_count] || 0 %></span>
+                        </div>
+                      <% end %>
+                    </div>
+                  </article>
+                <% end %>
+              </div>
+
+              <details class="github-inspector mb-4">
+                <summary>GitHub Data Inspector (TA / Admin)</summary>
+                <% @teams.each do |team| %>
+                  <% inspector = @github_inspector[team.id] || {} %>
+                  <div class="github-inspector-team mt-3">
+                    <h6><%= team.name %></h6>
+                    <p class="mb-1"><strong>Project URL:</strong> <%= inspector[:project_url] || "N/A" %></p>
+                    <p class="mb-1"><strong>Repo:</strong> <%= inspector[:repo_full_name] || "N/A" %></p>
+                    <p class="mb-1"><strong>Status Options:</strong> <%= Array(inspector[:status_options]).join(", ") %></p>
+                    <p class="mb-2"><strong>Card Counts:</strong> <%= (inspector[:card_counts] || {}).map { |k, v| "#{k}=#{v}" }.join(" | ") %></p>
+                    <% (inspector[:sprint_payloads] || {}).each do |sprint_name, payload| %>
+                      <div class="github-inspector-sprint">
+                        <strong><%= sprint_name %></strong>
+                        <span>Window: <%= payload[:start_date] %> - <%= payload[:end_date] %></span>
+                        <span>Total Commits: <%= payload[:total_commits] %></span>
+                        <span>0-Commit Students: <%= Array(payload[:students_without_commits]).join(", ").presence || "None" %></span>
+                      </div>
+                    <% end %>
+                  </div>
+                <% end %>
+              </details>
+
               <!-- TABLE -->
               <div class="table-responsive team-status-table-wrap">
                 <table class="table table-bordered align-middle text-center team-status-table">
@@ -146,8 +198,13 @@
 
                   <tbody>
                     <% @teams.each do |team| %>
+                      <% team_summary = @team_overview_by_id[team.id] || {} %>
                       <% team.students.each_with_index do |student, i| %>
-                        <tr>
+                        <tr
+                          data-team-filter="1"
+                          data-team-id="<%= team.id %>"
+                          data-at-risk="<%= team_summary[:any_at_risk] %>"
+                          data-missing-done="<%= team_summary[:any_missing_sprint_done] %>">
                           <% if i == 0 %>
                             <td class="sticky-col-1" rowspan="<%= team.students.size %>">
                               <div class="sticky-cell">
@@ -185,11 +242,11 @@
                                       <%= estimated_hours %>
                                     <% end %>
                                   <% when "KU" %>
-                                    <% metric = @status_metrics.dig(team.id, student.id, sprint, :ku) || {} %>
-                                    <%= "Archived: #{metric[:archived_column_exists] ? 'Yes' : 'No'} | Stale: #{metric[:stale_team_tasks] || 0}" %>
+                                    <% metric = @team_sprint_metrics.dig(team.id, sprint) || {} %>
+                                    <%= "Archived: #{metric[:archived_column_exists] ? 'Yes' : 'No'} | Active: #{metric[:active_now_cards] || 0}" %>
                                   <% when "PP" %>
-                                    <% metric = @status_metrics.dig(team.id, student.id, sprint, :pp) || {} %>
-                                    <%= "Board Done: #{metric[:current_board_done_cards] || 0} | #{sprint}: #{metric[:sprint_done_cards] || 0} | Active: #{metric[:active_now_cards] || 0}" %>
+                                    <% metric = @team_sprint_metrics.dig(team.id, sprint) || {} %>
+                                    <%= "Board Done: #{metric[:current_board_done_cards] || 0} | #{sprint}: #{metric[:sprint_done_cards] || 0} | Total: #{metric[:total_cards] || 0}" %>
 
                                   <% when "CBP" %>
                                     <% metric = @status_metrics.dig(team.id, student.id, sprint, :cbp) %>
@@ -303,6 +360,38 @@
               g.style.display = g.classList.contains(key) ? "" : "none";
             });
           }
+        });
+      });
+
+      const teamFilterButtons = document.querySelectorAll('.team-filter');
+      const teamRows = document.querySelectorAll('tr[data-team-filter="1"]');
+      const teamCards = document.querySelectorAll('[data-team-card="1"]');
+
+      function shouldShowForFilter(element, filter) {
+        if (filter === 'all') return true;
+        if (filter === 'at-risk') return element.dataset.atRisk === 'true';
+        if (filter === 'missing-done') return element.dataset.missingDone === 'true';
+        return true;
+      }
+
+      function applyTeamFilter(filter) {
+        teamRows.forEach(row => {
+          row.style.display = shouldShowForFilter(row, filter) ? '' : 'none';
+        });
+
+        teamCards.forEach(card => {
+          card.style.display = shouldShowForFilter(card, filter) ? '' : 'none';
+        });
+      }
+
+      teamFilterButtons.forEach(button => {
+        if (button.dataset.teamFilterBound === '1') return;
+        button.dataset.teamFilterBound = '1';
+
+        button.addEventListener('click', () => {
+          teamFilterButtons.forEach(btn => btn.classList.remove('active'));
+          button.classList.add('active');
+          applyTeamFilter(button.dataset.filter || 'all');
         });
       });
     } 

@@ -36,3 +36,86 @@
   background-color: var(--bs-primary);
   color: var(--bs-white);
 }
+
+.semesters-show .team-filter.active {
+  color: #fff;
+  background-color: #1f4cb2;
+  border-color: #1f4cb2;
+}
+
+.team-overview-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+}
+
+.team-overview-card {
+  border: 1px solid #d9e2f7;
+  border-radius: 8px;
+  background: #f8fbff;
+  padding: 12px;
+  text-align: left;
+}
+
+.team-overview-name {
+  font-size: 1rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+.team-overview-meta {
+  color: #5b6680;
+  font-size: 0.85rem;
+}
+
+.team-overview-sprints {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.team-overview-sprint-pill {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  font-size: 0.8rem;
+  border-radius: 999px;
+  padding: 4px 10px;
+}
+
+.team-overview-sprint-pill.is-healthy {
+  background: #eaf8ef;
+  color: #145f31;
+}
+
+.team-overview-sprint-pill.is-risk {
+  background: #fff3f0;
+  color: #9f2f1d;
+}
+
+.github-inspector {
+  text-align: left;
+  border: 1px solid #d8deea;
+  border-radius: 8px;
+  background: #f8fafc;
+  padding: 10px 12px;
+}
+
+.github-inspector summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.github-inspector-team {
+  border-top: 1px dashed #c7cfdf;
+  padding-top: 10px;
+}
+
+.github-inspector-sprint {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 0.82rem;
+  padding: 2px 0;
+}

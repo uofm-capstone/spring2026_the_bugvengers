@@ -345,6 +345,9 @@ def status
 
     @team_project_data = {}
     @team_board_health = {}
+    @team_sprint_metrics = {}
+    @team_status_overview = []
+    @github_inspector = {}
     @status_metrics = {}
 
     @teams.each do |team|
@@ -354,11 +357,13 @@ def status
 
       @team_project_data[team.id] = project_cards
       @team_board_health[team.id] = board_health
+      @team_sprint_metrics[team.id] = {}
       @status_metrics[team.id] = {}
 
       repo_full_name = resolve_team_repo_full_name(team)
       sprint_commit_metrics = {}
       sprint_progress_metrics = {}
+      inspector_sprints = {}
 
       @sprints.each do |sprint|
         if repo_full_name.present?
@@ -369,6 +374,24 @@ def status
           sprint_commit_metrics[sprint.name] = {}
           sprint_progress_metrics[sprint.name] = {}
         end
+
+        team_metric = build_team_sprint_metrics(
+          team_cards: project_cards,
+          board_health: board_health,
+          sprint: sprint,
+          sprint_commit_metric_map: sprint_commit_metrics[sprint.name],
+          students: team.students
+        )
+        @team_sprint_metrics[team.id][sprint.name] = team_metric
+
+        inspector_sprints[sprint.name] = {
+          start_date: sprint.start_date,
+          end_date: sprint.end_date,
+          progress_deadline: sprint.progress_deadline,
+          total_commits: team_metric[:team_commit_count],
+          commit_authors: sprint_commit_metrics[sprint.name].keys.sort,
+          students_without_commits: team_metric[:students_without_commits]
+        }
       end
 
       team.students.each do |student|
@@ -385,7 +408,26 @@ def status
           )
         end
       end
+
+      @team_status_overview << {
+        team_id: team.id,
+        team_name: team.name,
+        students_count: team.students.count,
+        any_at_risk: @team_sprint_metrics[team.id].values.any? { |metric| metric[:at_risk] },
+        any_missing_sprint_done: @team_sprint_metrics[team.id].values.any? { |metric| metric[:missing_sprint_done] },
+        sprint_metrics: @team_sprint_metrics[team.id]
+      }
+
+      @github_inspector[team.id] = {
+        project_url: team.project_board_url,
+        status_options: board_health.status_options,
+        card_counts: @service.get_card_count_per_column(project_cards),
+        repo_full_name: repo_full_name,
+        sprint_payloads: inspector_sprints
+      }
     end
+
+    @team_overview_by_id = @team_status_overview.index_by { |summary| summary[:team_id] }
 
     render :show
 end
@@ -518,6 +560,45 @@ end
         lines_changed_since_progress: tsp_commit.lines_changed,
         stale_assigned_tasks: stale_assigned_cards
       }
+    }
+  end
+
+  def build_team_sprint_metrics(team_cards:, board_health:, sprint:, sprint_commit_metric_map:, students:)
+    columns = @service.get_card_count_per_column(team_cards)
+    sprint_done_count = team_cards.count { |card| done_in_sprint_status?(card.status, sprint.name) }
+    done_in_any_sprint_count = team_cards.count { |card| done_in_any_sprint_status?(card.status) }
+    current_board_done_count = columns["Done"]
+    archived_count = columns["Archived"]
+    active_now_count = columns["Backlog"] + columns["Todo"] + columns["To Do"] + columns["In Progress"]
+    total_count = columns.values.sum
+
+    students_without_commits = students.filter_map do |student|
+      next if student.github_username.blank?
+
+      commit_metric = cbp_metric_for_user(sprint_commit_metric_map, student.github_username)
+      student.github_username if commit_metric.commit_count.zero?
+    end
+
+    risk_reasons = []
+    risk_reasons << "No cards in Done in #{sprint.name}" if sprint_done_count.zero?
+    if students_without_commits.any?
+      risk_reasons << "#{students_without_commits.count}/#{students.count} students have 0 commits"
+    end
+
+    {
+      sprint_name: sprint.name,
+      archived_column_exists: board_health.archived_column_exists,
+      current_board_done_cards: current_board_done_count,
+      sprint_done_cards: sprint_done_count,
+      done_in_any_sprint_cards: done_in_any_sprint_count,
+      archived_cards: archived_count,
+      active_now_cards: active_now_count,
+      total_cards: total_count,
+      missing_sprint_done: sprint_done_count.zero?,
+      students_without_commits: students_without_commits,
+      team_commit_count: sprint_commit_metric_map.values.sum(&:commit_count),
+      at_risk: risk_reasons.any?,
+      at_risk_reasons: risk_reasons
     }
   end
 

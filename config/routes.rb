@@ -1,7 +1,9 @@
 Rails.application.routes.draw do
   get 'admin/dashboard'
   root to: 'pages#home'
-  devise_for :users
+  devise_for :users, controllers: {
+  sessions: 'users/sessions'
+}
   # resources :sprints
 
 

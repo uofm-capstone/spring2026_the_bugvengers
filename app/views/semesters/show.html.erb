@@ -73,79 +73,9 @@
                 </ul>
               </div>
 
-              <!-- 🔹 Sprint Filter Buttons (includes "All") -->
-              <div class="text-center mb-3">
-                <button
-                  class="btn btn-outline-primary m-1 sprint-toggle active"
-                  data-sprint="all">
-                  All
-                </button>
-
-                <% @sprint_list.each do |sprint| %>
-                  <button
-                    class="btn btn-outline-primary m-1 sprint-toggle"
-                    data-sprint="<%= sprint.parameterize %>">
-                    <%= sprint %>
-                  </button>
-                <% end %>
-              </div>
-
-              <div class="d-flex flex-wrap justify-content-center gap-2 mb-3">
-                <button class="btn btn-sm btn-outline-secondary team-filter active" data-filter="all">All Teams</button>
-                <button class="btn btn-sm btn-outline-danger team-filter" data-filter="at-risk">At-Risk Teams</button>
-                <button class="btn btn-sm btn-outline-warning team-filter" data-filter="missing-done">Missing Done In Sprint</button>
-              </div>
-
-              <div class="team-overview-grid mb-4">
-                <% @team_status_overview.each do |summary| %>
-                  <article
-                    class="team-overview-card"
-                    data-team-card="1"
-                    data-team-id="<%= summary[:team_id] %>"
-                    data-at-risk="<%= summary[:any_at_risk] %>"
-                    data-missing-done="<%= summary[:any_missing_sprint_done] %>">
-                    <h5 class="team-overview-name mb-1"><%= summary[:team_name] %></h5>
-                    <p class="team-overview-meta mb-2"><%= summary[:students_count] %> students</p>
-                    <% if summary[:any_at_risk] %>
-                      <p class="team-overview-risk mb-2">At risk: <%= summary[:at_risk_reason_preview].join(" | ") %></p>
-                    <% else %>
-                      <p class="team-overview-ok mb-2">No active TA flags for current data.</p>
-                    <% end %>
-                    <div class="team-overview-sprints">
-                      <% @sprint_list.each do |sprint| %>
-                        <% sprint_metric = summary.dig(:sprint_metrics, sprint) || {} %>
-                        <div class="team-overview-sprint-pill <%= sprint_metric[:at_risk] ? 'is-risk' : 'is-healthy' %>">
-                          <strong><%= sprint %></strong>
-                          <span>Done: <%= sprint_metric[:sprint_done_cards] || 0 %></span>
-                          <span>Commits: <%= sprint_metric[:team_commit_count] || 0 %></span>
-                        </div>
-                      <% end %>
-                    </div>
-                  </article>
-                <% end %>
-              </div>
-
-              <details class="github-inspector mb-4">
-                <summary>GitHub Data Inspector (TA / Admin)</summary>
-                <% @teams.each do |team| %>
-                  <% inspector = @github_inspector[team.id] || {} %>
-                  <div class="github-inspector-team mt-3">
-                    <h6><%= team.name %></h6>
-                    <p class="mb-1"><strong>Project URL:</strong> <%= inspector[:project_url] || "N/A" %></p>
-                    <p class="mb-1"><strong>Repo:</strong> <%= inspector[:repo_full_name] || "N/A" %></p>
-                    <p class="mb-1"><strong>Status Options:</strong> <%= Array(inspector[:status_options]).join(", ") %></p>
-                    <p class="mb-2"><strong>Card Counts:</strong> <%= (inspector[:card_counts] || {}).map { |k, v| "#{k}=#{v}" }.join(" | ") %></p>
-                    <% (inspector[:sprint_payloads] || {}).each do |sprint_name, payload| %>
-                      <div class="github-inspector-sprint">
-                        <strong><%= sprint_name %></strong>
-                        <span>Window: <%= payload[:start_date] %> - <%= payload[:end_date] %></span>
-                        <span>Total Commits: <%= payload[:total_commits] %></span>
-                        <span>0-Commit Students: <%= Array(payload[:students_without_commits]).join(", ").presence || "None" %></span>
-                      </div>
-                    <% end %>
-                  </div>
-                <% end %>
-              </details>
+              <%= render "semesters/status_filters", sprint_list: @sprint_list %>
+              <%= render "semesters/team_overview_cards", team_status_overview: @team_status_overview, sprint_list: @sprint_list %>
+              <%= render "semesters/github_data_inspector", teams: @teams, github_inspector: @github_inspector %>
 
               <!-- TABLE -->
               <div class="table-responsive team-status-table-wrap">

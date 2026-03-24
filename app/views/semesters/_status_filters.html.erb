@@ -1,0 +1,20 @@
+<!-- Sprint + Team Filters -->
+<div class="text-center mb-3">
+  <button class="btn btn-outline-primary m-1 sprint-toggle active" data-sprint="all">
+    All
+  </button>
+
+  <% sprint_list.each do |sprint| %>
+    <button
+      class="btn btn-outline-primary m-1 sprint-toggle"
+      data-sprint="<%= sprint.parameterize %>">
+      <%= sprint %>
+    </button>
+  <% end %>
+</div>
+
+<div class="d-flex flex-wrap justify-content-center gap-2 mb-3">
+  <button class="btn btn-sm btn-outline-secondary team-filter active" data-filter="all">All Teams</button>
+  <button class="btn btn-sm btn-outline-danger team-filter" data-filter="at-risk">At-Risk Teams</button>
+  <button class="btn btn-sm btn-outline-warning team-filter" data-filter="missing-done">Missing Done In Sprint</button>
+</div>

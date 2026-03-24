@@ -29,4 +29,21 @@ module SemestersHelper
             class: 'dropdown-item'
   end
 
+  def team_risk_reason_preview(summary)
+    Array(summary[:at_risk_reason_preview]).join(" | ")
+  end
+
+  def sprint_pill_state_class(sprint_metric)
+    sprint_metric[:at_risk] ? "is-risk" : "is-healthy"
+  end
+
+  def format_card_counts(card_counts)
+    (card_counts || {}).map { |status, count| "#{status}=#{count}" }.join(" | ")
+  end
+
+  def format_students_without_commits(usernames)
+    list = Array(usernames)
+    list.present? ? list.join(", ") : "None"
+  end
+
 end

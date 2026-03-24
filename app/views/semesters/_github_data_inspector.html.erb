@@ -1,0 +1,23 @@
+<details class="github-inspector mb-4">
+  <summary>GitHub Data Inspector (TA / Admin)</summary>
+
+  <% teams.each do |team| %>
+    <% inspector = github_inspector[team.id] || {} %>
+    <div class="github-inspector-team mt-3">
+      <h6><%= team.name %></h6>
+      <p class="mb-1"><strong>Project URL:</strong> <%= inspector[:project_url] || "N/A" %></p>
+      <p class="mb-1"><strong>Repo:</strong> <%= inspector[:repo_full_name] || "N/A" %></p>
+      <p class="mb-1"><strong>Status Options:</strong> <%= Array(inspector[:status_options]).join(", ") %></p>
+      <p class="mb-2"><strong>Card Counts:</strong> <%= format_card_counts(inspector[:card_counts]) %></p>
+
+      <% (inspector[:sprint_payloads] || {}).each do |sprint_name, payload| %>
+        <div class="github-inspector-sprint">
+          <strong><%= sprint_name %></strong>
+          <span>Window: <%= payload[:start_date] %> - <%= payload[:end_date] %></span>
+          <span>Total Commits: <%= payload[:total_commits] %></span>
+          <span>0-Commit Students: <%= format_students_without_commits(payload[:students_without_commits]) %></span>
+        </div>
+      <% end %>
+    </div>
+  <% end %>
+</details>

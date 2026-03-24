@@ -491,7 +491,7 @@ end
       card.assignees.include?(student.github_username)
     end
 
-    columns = service.get_card_count_per_column(team_cards)
+    columns = @service.get_card_count_per_column(team_cards)
     completed_count = columns["Done"] + columns["Archived"]
     total_count = columns.values.sum
 

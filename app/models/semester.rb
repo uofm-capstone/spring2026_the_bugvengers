@@ -665,6 +665,11 @@ def import_students_from_csv
             )
             if user.save
               student.update!(user: user)
+              begin
+                StudentMailer.welcome_email(user, temp_password).deliver_later
+              rescue => e
+                row_errors << "Row #{i + 2}: Account created but welcome email failed - #{e.message}"
+              end
             else
               row_errors << "Row #{i + 2}: Login account creation failed — #{user.errors.full_messages.join(', ')}"
             end
@@ -696,6 +701,11 @@ def import_students_from_csv
             )
             if user.save
               student.update!(user: user)
+              begin
+                StudentMailer.welcome_email(user, temp_password).deliver_later
+              rescue => e
+                row_errors << "Row #{i + 2}: Account created but welcome email failed - #{e.message}"
+              end
             else
               row_errors << "Row #{i + 2}: Login account creation failed - #{user.errors.full_messages.join(',')}"
             end

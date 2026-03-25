@@ -1,0 +1,15 @@
+<h1>Welcome to TAG!</h1>
+
+<p>Hello <%= @user.full_name || @user.email %>,</p>
+
+<p>Your account has been created. Use the details below to login for the first time.</p>
+
+<ul>
+  <li><strong>Email:</strong> <%= @user.email %></li>
+  <li><strong>Temporary password:</strong> <%= @temp_password %></li>
+</ul>
+
+<p>
+  <%= link_to "Log in to TAG", @login_url %>
+</p>
+

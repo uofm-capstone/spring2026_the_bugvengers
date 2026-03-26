@@ -20,14 +20,21 @@
             placeholder: "Search users by email or name...",
             class: "ui-input",
             style: "flex: 1;" %>
-
-      <%= f.submit "Search", class: "btn btn-primary" %>
-
+      <%= f.select :role,
+            options_for_select([
+              ["All Roles", ""],
+              ["Admin", "admin"],
+              ["TA", "ta"],
+              ["Student", "student"]
+            ], params[:role]),
+            {},
+            class: "ui-input" %>
+      <%= f.submit "Filter", class: "btn btn-primary" %>
       <%= link_to "Clear",
             admin_dashboard_path,
             class: "btn btn-secondary" %>
     </div>
-  <% end %>
+    <% end %>
   </div>
   <div class="ui-table-wrap">
     <table class="table ui-table">

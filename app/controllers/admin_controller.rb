@@ -6,11 +6,17 @@ class AdminController < ApplicationController
 
   def dashboard
     @semesters = Semester.all
+    all_users = User.all
+    @users = all_users
     if params[:search].present?
       @users = User.where("email ILIKE :search",search: "%#{params[:search]}%").order(:email)
     else
       @users = User.all.order(:email)
     end
+    if params[:role].present?
+      @users = @users.where(role: params[:role])
+    end
+    @users = @users.order(:email)
     @dashboard_stats = {
       total_users: @users.size,
       staff_users: @users.count { |user| user.admin? || user.ta? },

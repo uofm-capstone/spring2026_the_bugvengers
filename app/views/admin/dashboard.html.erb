@@ -9,19 +9,26 @@
   <%= render "shared/stat_card", label: "Semesters", value: @dashboard_stats[:semesters] %>
 </section>
 
-<%= form_with url: admin_dashboard_path, method: :get, local: true do |f| %>
-  <div style="margin-bottom: 15px;">
-    <%= f.text_field :search, value: params[:search], placeholder: "Search by email..." %>
-    <%= f.submit "Search" %>
-    <%= link_to "Clear", admin_dashboard_path %>
-  </div>
-<% end %>
 
 <section class="admin-dashboard__table-card">
   <div class="ui-card__body">
-    <h2>User Management</h2>
-  </div>
+  <h2 style="margin-bottom: 10px;">User Management</h2>
+  <%= form_with url: admin_dashboard_path, method: :get, local: true, class: "ui-form" do |f| %>
+    <div style="display: flex; gap: 10px; align-items: center;">
+      <%= f.text_field :search,
+            value: params[:search],
+            placeholder: "Search users by email or name...",
+            class: "ui-input",
+            style: "flex: 1;" %>
 
+      <%= f.submit "Search", class: "btn btn-primary" %>
+
+      <%= link_to "Clear",
+            admin_dashboard_path,
+            class: "btn btn-secondary" %>
+    </div>
+  <% end %>
+  </div>
   <div class="ui-table-wrap">
     <table class="table ui-table">
       <thead class="text-center">

@@ -7,7 +7,7 @@ class AdminController < ApplicationController
   def dashboard
     @semesters = Semester.all
     if params[:search].present?
-      @users = User.where("email ILIKE ?", "%#{params[:search]}%").order(:email)
+      @users = User.where("email ILIKE :search",search: "%#{params[:search]}%").order(:email)
     else
       @users = User.all.order(:email)
     end

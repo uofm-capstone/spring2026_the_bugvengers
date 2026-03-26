@@ -9,6 +9,14 @@
   <%= render "shared/stat_card", label: "Semesters", value: @dashboard_stats[:semesters] %>
 </section>
 
+<%= form_with url: admin_dashboard_path, method: :get, local: true do |f| %>
+  <div style="margin-bottom: 15px;">
+    <%= f.text_field :search, value: params[:search], placeholder: "Search by email..." %>
+    <%= f.submit "Search" %>
+    <%= link_to "Clear", admin_dashboard_path %>
+  </div>
+<% end %>
+
 <section class="admin-dashboard__table-card">
   <div class="ui-card__body">
     <h2>User Management</h2>

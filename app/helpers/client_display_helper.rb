@@ -65,10 +65,13 @@ module ClientDisplayHelper
 
       begin
         semester.client_csv.open do |tempClient|
-          client_data_raw = SmarterCSV.process(tempClient.path)
-          full_questions = extract_full_questions(tempClient.path)
+          # Centralized parser returns both grouped LLM payload and helper-friendly normalized rows.
+          parsed = CsvSurveyParserService.new(file: tempClient).parse
+          client_data_raw = parsed[:rows]
+          # q2_* prompt labels are extracted from the second CSV row by the service.
+          full_questions = parsed[:full_questions]
 
-          @client_question_titles = client_data_raw[0].select { |key, _| key.to_s.start_with?('q') }
+          @client_question_titles = client_data_raw[0]&.select { |key, _| key.to_s.start_with?('q') } || {}
 
 
           max_similarity = 0
@@ -88,6 +91,7 @@ module ClientDisplayHelper
             end
           end
 
+          # Preserve prior behavior: select one team's responses for the requested sprint.
           cliSurvey = client_data_raw.find_all { |survey| survey[:q1_team] == best_matching_team && survey[:q3] == sprint }
           cliSurvey.map! { |survey| survey.select { |key, _| key.to_s.start_with?('q') } }
 
@@ -110,16 +114,6 @@ module ClientDisplayHelper
     end
 
     private
-
-    #helps display the questions from the second roll in the CSV
-    def extract_full_questions(csv_path)
-      csv = CSV.read(csv_path, headers: true)
-      question_headers = csv.headers.grep(/\Aq2_\d+\z/i)
-      full_questions = csv[0].values_at(*question_headers)
-      Hash[question_headers.zip(full_questions)]
-    end
-
-
 
 
 end

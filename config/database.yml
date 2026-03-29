@@ -14,7 +14,7 @@ development:
 
 test:
   <<: *default
-  host: db
+  host: <%= ENV['DATABASE_HOST'] || 'localhost' %>
   database: checkmate_test
 
 production:

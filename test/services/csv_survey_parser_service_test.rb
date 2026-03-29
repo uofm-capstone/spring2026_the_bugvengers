@@ -12,6 +12,15 @@ class CsvSurveyParserServiceTest < ActiveSupport::TestCase
     team_entry = result[:dataset].find { |row| row[:team].include?("Bugvengers") }
     refute_nil team_entry
     assert_includes team_entry[:responses], "nope :)"
+
+    refute_empty result[:respondents]
+    first_respondent = result[:respondents].first
+    assert_equal "R_38A4IT7WH5HvuuQ", first_respondent[:respondent_id]
+    refute_nil first_respondent[:metadata][:submitted_at]
+    assert_equal "Sprint 2", first_respondent[:metadata][:sprint]
+
+    scale_response = first_respondent[:responses].find { |response| response[:type] == :scale }
+    refute_nil scale_response
   end
 
   test "returns empty dataset for malformed csv" do

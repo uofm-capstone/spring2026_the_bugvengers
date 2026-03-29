@@ -13,7 +13,7 @@ class CsvSurveyParserService
   TEAM_HINT = /which\s+project\s+team/i
   SPRINT_HINT = /which\s+sprint/i
   FEEDBACK_HEADER = /\Aq7\z/i
-  OPTIONAL_TEXT_HEADERS = [ /\Aq4\z/i, /\Aq5\z/i, /\Aq6\z/i, /\Aq7\z/i ].freeze
+  RESPONSE_HEADERS = [ /\Aq2_\d+\z/i, /\Aq4\z/i, /\Aq5\z/i, /\Aq6\z/i, /\Aq7\z/i ].freeze
 
   def initialize(file: nil, csv_string: nil, logger: Rails.logger)
     @file = file
@@ -64,6 +64,10 @@ class CsvSurveyParserService
     full_questions = build_full_questions(headers, question_row)
     grouped = Hash.new { |h, k| h[k] = [] }
     rows = []
+    respondents = []
+
+    submitted_at_index = detect_normalized_index(headers, "recordeddate") || detect_normalized_index(headers, "startdate")
+    response_id_index = detect_normalized_index(headers, "responseid")
 
     data_rows.each_with_index do |row, index|
       next if skip_row?(row)
@@ -82,6 +86,18 @@ class CsvSurveyParserService
         normalized_row[:q3] = sprint if sprint
 
         question_responses = build_question_responses(headers, question_row, cleaned)
+        respondent_id = response_id_index.nil? ? nil : cleaned[response_id_index]
+        submitted_at = submitted_at_index.nil? ? nil : cleaned[submitted_at_index]
+
+        respondents << {
+          respondent_id: respondent_id,
+          responses: question_responses,
+          metadata: {
+            submitted_at: submitted_at,
+            sprint: sprint,
+            team: team_name
+          }
+        }
 
         rows << {
           team: team_name,
@@ -108,6 +124,7 @@ class CsvSurveyParserService
       # Keep legacy-compatible keys used by existing helpers/views.
       rows: rows.map { |r| r[:raw].merge(q1_team: r[:team], q3: r[:sprint], q7: r[:q7]) },
       full_questions: full_questions,
+      respondents: respondents,
       warnings: warnings,
       errors: errors
     }
@@ -199,7 +216,7 @@ class CsvSurveyParserService
     responses = []
 
     headers.each_with_index do |header, index|
-      next unless OPTIONAL_TEXT_HEADERS.any? { |pattern| header.to_s.match?(pattern) }
+      next unless RESPONSE_HEADERS.any? { |pattern| header.to_s.match?(pattern) }
 
       answer = values[index]
       next if answer.nil?
@@ -251,6 +268,10 @@ class CsvSurveyParserService
     headers.find_index { |header| header.to_s.match?(regex) }
   end
 
+  def detect_normalized_index(headers, normalized_name)
+    headers.find_index { |header| normalize_header(header) == normalized_name }
+  end
+
   def skip_row?(row)
     return true if row.nil? || row.all? { |value| value.to_s.strip.empty? }
 
@@ -259,6 +280,6 @@ class CsvSurveyParserService
   end
 
   def empty_result(warnings:, errors:)
-    { dataset: [], rows: [], full_questions: {}, warnings: warnings, errors: errors }
+    { dataset: [], rows: [], full_questions: {}, respondents: [], warnings: warnings, errors: errors }
   end
 end

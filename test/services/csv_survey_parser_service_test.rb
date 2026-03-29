@@ -1,10 +1,10 @@
 require "test_helper"
 
-class CsvSurveyParserServiceTest < ActiveSupport::TestCase
+class CSVSurveyParserServiceTest < ActiveSupport::TestCase
   test "parses client_feedback csv into grouped dataset" do
     file_path = Rails.root.join("client_feedback.csv")
 
-    result = CsvSurveyParserService.new(file: file_path.to_s).parse
+    result = CSVSurveyParserService.new(file: file_path.to_s).parse
 
     assert result[:errors].empty?
     refute_empty result[:dataset]
@@ -26,7 +26,7 @@ class CsvSurveyParserServiceTest < ActiveSupport::TestCase
   test "returns empty dataset for malformed csv" do
     malformed_csv = "Q1,Q3,Q7\n\"broken,Sprint 2,Feedback"
 
-    result = CsvSurveyParserService.new(csv_string: malformed_csv).parse
+    result = CSVSurveyParserService.new(csv_string: malformed_csv).parse
 
     assert_empty result[:dataset]
     refute_empty result[:errors]
@@ -40,7 +40,7 @@ class CsvSurveyParserServiceTest < ActiveSupport::TestCase
       Team A,Sprint 1,Some text
     CSV
 
-    result = CsvSurveyParserService.new(csv_string: csv_string).parse
+    result = CSVSurveyParserService.new(csv_string: csv_string).parse
 
     assert_empty result[:dataset]
     assert_includes result[:errors].join(" "), "Q7"
@@ -54,7 +54,7 @@ class CsvSurveyParserServiceTest < ActiveSupport::TestCase
       ,Sprint 1,Need faster updates
     CSV
 
-    result = CsvSurveyParserService.new(csv_string: csv_string).parse
+    result = CSVSurveyParserService.new(csv_string: csv_string).parse
 
     assert_equal 1, result[:dataset].length
     assert_equal "Unknown Team", result[:dataset][0][:team]
@@ -70,7 +70,7 @@ class CsvSurveyParserServiceTest < ActiveSupport::TestCase
       Team A,Sprint 2,Great progress
     CSV
 
-    result = CsvSurveyParserService.new(csv_string: csv_string).parse
+    result = CSVSurveyParserService.new(csv_string: csv_string).parse
 
     assert_equal 1, result[:dataset].length
     assert_equal ["Great progress"], result[:dataset][0][:responses]

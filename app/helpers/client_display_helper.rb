@@ -66,7 +66,7 @@ module ClientDisplayHelper
       begin
         semester.client_csv.open do |tempClient|
           # Centralized parser returns both grouped LLM payload and helper-friendly normalized rows.
-          parsed = CsvSurveyParserService.new(file: tempClient).parse
+          parsed = CSVSurveyParserService.new(file: tempClient).parse
           flags.append("client csv error") if parsed[:errors].present?
 
           client_data_raw = parsed[:rows]

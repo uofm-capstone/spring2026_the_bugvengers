@@ -348,7 +348,7 @@ def status
       project_cards = @service.project_cards(team.project_board_url)
       @team_project_data[team.name] = project_cards
     end
-    
+
     render :show
 end
 
@@ -389,6 +389,42 @@ end
     rescue => e
       flags.append("no data")
     end
+
+    begin
+      semester.client_csv.open do |tempClient|
+        parsed = CSVSurveyParserService.new(file: tempClient).parse
+        if parsed[:errors].present?
+          flags.append("client csv error")
+          next
+        end
+
+        client_rows = parsed[:rows]
+        next if client_rows.blank?
+
+        sprint_rows = client_rows.select do |row|
+          row[:q3].to_s.strip.casecmp?(sprint.to_s.strip)
+        end
+
+        if sprint_rows.blank?
+          flags.append("client blank")
+          next
+        end
+
+        best_match = sprint_rows.max_by do |row|
+          next 0.0 if row[:q1_team].blank?
+
+          similarities = compare_strings(team.to_s, row[:q1_team].to_s)
+          (similarities[:jaro_winkler].to_f + similarities[:levenshtein].to_f) / 2.0
+        end
+
+        team_rows = sprint_rows.select { |row| row[:q1_team] == best_match[:q1_team] }
+        flags.append("client blank") if team_rows.blank?
+      end
+    rescue => e
+      Rails.logger.debug("DEBUG: Exception processing client flags CSV: #{e}")
+      flags.append("client csv error")
+    end
+
     flags
   end
 

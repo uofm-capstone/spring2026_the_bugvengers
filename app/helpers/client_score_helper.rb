@@ -27,7 +27,7 @@ module ClientScoreHelper
         semester.client_csv.open do |tempfile|
           begin
             # Reuse centralized parsing rules (Qualtrics rows, metadata skipping, normalization).
-            parsed = CsvSurveyParserService.new(file: tempfile).parse
+            parsed = CSVSurveyParserService.new(file: tempfile).parse
             return "Error! Unable to read sponsor data." if parsed[:errors].present? && parsed[:rows].blank?
 
             table = parsed[:rows]

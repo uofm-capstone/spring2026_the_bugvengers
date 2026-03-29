@@ -2,7 +2,7 @@
 
 require "csv"
 
-class CsvSurveyParserService
+class CSVSurveyParserService
   # Qualtrics/system fields we do not use for LLM feedback grouping.
   IGNORE_HEADERS = %w[
     startdate enddate status progress finished ipaddress
@@ -57,7 +57,7 @@ class CsvSurveyParserService
 
     if q7_index.nil?
       errors << "Missing required feedback column Q7"
-      @logger.error("CsvSurveyParserService: Missing required feedback column Q7")
+      @logger.error("CSVSurveyParserService: Missing required feedback column Q7")
       return empty_result(warnings: warnings, errors: errors)
     end
 
@@ -111,7 +111,7 @@ class CsvSurveyParserService
         grouped[team_name] << q7_value
       rescue StandardError => e
         warnings << "Row #{index + 4} skipped: #{e.message}"
-        @logger.warn("CsvSurveyParserService: row #{index + 4} skipped (#{e.class}): #{e.message}")
+        @logger.warn("CSVSurveyParserService: row #{index + 4} skipped (#{e.class}): #{e.message}")
       end
     end
 
@@ -129,7 +129,7 @@ class CsvSurveyParserService
       errors: errors
     }
   rescue StandardError => e
-    @logger.error("CsvSurveyParserService failed: #{e.class} - #{e.message}")
+    @logger.error("CSVSurveyParserService failed: #{e.class} - #{e.message}")
     empty_result(warnings: warnings, errors: errors + [e.message])
   end
 
@@ -144,11 +144,11 @@ class CsvSurveyParserService
     CSV.parse(encoded, headers: false)
   rescue CSV::MalformedCSVError => e
     errors << "Malformed CSV: #{e.message}"
-    @logger.error("CsvSurveyParserService malformed CSV: #{e.message}")
+    @logger.error("CSVSurveyParserService malformed CSV: #{e.message}")
     []
   rescue StandardError => e
     errors << "Unable to parse CSV: #{e.message}"
-    @logger.error("CsvSurveyParserService parse error: #{e.class} - #{e.message}")
+    @logger.error("CSVSurveyParserService parse error: #{e.class} - #{e.message}")
     []
   end
 

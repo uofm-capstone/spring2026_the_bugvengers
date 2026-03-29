@@ -15,7 +15,7 @@ development:
 test:
   <<: *default
   host: <%= ENV['DATABASE_HOST'] || 'localhost' %>
-  database: checkmate_test
+  database: tag_app_test
 
 production:
   adapter: postgresql

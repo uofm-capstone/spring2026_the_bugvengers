@@ -67,6 +67,8 @@ module ClientDisplayHelper
         semester.client_csv.open do |tempClient|
           # Centralized parser returns both grouped LLM payload and helper-friendly normalized rows.
           parsed = CsvSurveyParserService.new(file: tempClient).parse
+          flags.append("client csv error") if parsed[:errors].present?
+
           client_data_raw = parsed[:rows]
           # q2_* prompt labels are extracted from the second CSV row by the service.
           full_questions = parsed[:full_questions]

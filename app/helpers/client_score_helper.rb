@@ -28,7 +28,11 @@ module ClientScoreHelper
           begin
             # Reuse centralized parsing rules (Qualtrics rows, metadata skipping, normalization).
             parsed = CsvSurveyParserService.new(file: tempfile).parse
+            return "Error! Unable to read sponsor data." if parsed[:errors].present? && parsed[:rows].blank?
+
             table = parsed[:rows]
+            return "No Score" if table.blank?
+
             # Performance columns remain q2_* fields used by existing scoring logic.
             performance_columns = table.first&.keys&.select { |header| header.to_s.match?(PERFORMANCE_PATTERN) } || []
             sprint_column = table.first&.keys&.find { |header| header.to_s.match?(SPRINT_PATTERN) }

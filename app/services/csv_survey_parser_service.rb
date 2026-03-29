@@ -162,6 +162,8 @@ class CsvSurveyParserService
     row_hash = {}
 
     normalized_headers.each_with_index do |key, index|
+      next if ignored_header?(key)
+
       row_hash[key.to_sym] = values[index]
     end
 
@@ -187,6 +189,10 @@ class CsvSurveyParserService
 
   def normalize_header(header)
     header.to_s.downcase.gsub(/[^a-z0-9]+/, "_").gsub(/\A_+|_+\z/, "")
+  end
+
+  def ignored_header?(header)
+    IGNORE_HEADERS.include?(header.to_s)
   end
 
   def build_question_responses(headers, question_row, values)

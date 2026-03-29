@@ -75,26 +75,8 @@ module ClientDisplayHelper
 
           @client_question_titles = client_data_raw[0]&.select { |key, _| key.to_s.start_with?('q') } || {}
 
-
-          max_similarity = 0
-          best_matching_team = nil
-
-          client_data_raw.each do |client_survey|
-
-            next if client_survey[:q1_team].blank? || client_survey[:q1_team].start_with?('{')
-            next if client_survey[:q3].blank?
-
-            similarities = compare_strings(team, client_survey[:q1_team])
-            avg_similarity = (similarities[:jaro_winkler] + similarities[:levenshtein]) / 2.0
-
-            if avg_similarity > max_similarity
-              max_similarity = avg_similarity
-              best_matching_team = client_survey[:q1_team]
-            end
-          end
-
-          # Preserve prior behavior: select one team's responses for the requested sprint.
-          cliSurvey = client_data_raw.find_all { |survey| survey[:q1_team] == best_matching_team && survey[:q3] == sprint }
+          # Preserve prior behavior: select one best-matching team within the requested sprint.
+          cliSurvey = best_matching_team_rows(client_rows: client_data_raw, team: team, sprint: sprint)
           cliSurvey.map! { |survey| survey.select { |key, _| key.to_s.start_with?('q') } }
 
 
@@ -113,6 +95,34 @@ module ClientDisplayHelper
       end
 
       [client_data, flags]
+    end
+
+    # Shared matcher used by both team page rendering and semester status flags.
+    # It narrows rows by sprint, then chooses the closest team name match.
+    def best_matching_team_rows(client_rows:, team:, sprint:)
+      sprint_rows = client_rows.select do |row|
+        row[:q3].to_s.strip.casecmp?(sprint.to_s.strip)
+      end
+      return [] if sprint_rows.blank?
+
+      best_matching_team = nil
+      max_similarity = 0.0
+
+      sprint_rows.each do |client_survey|
+        next if client_survey[:q1_team].blank? || client_survey[:q1_team].start_with?('{')
+
+        similarities = compare_strings(team.to_s, client_survey[:q1_team].to_s)
+        avg_similarity = (similarities[:jaro_winkler].to_f + similarities[:levenshtein].to_f) / 2.0
+
+        if avg_similarity > max_similarity
+          max_similarity = avg_similarity
+          best_matching_team = client_survey[:q1_team]
+        end
+      end
+
+      return [] if best_matching_team.blank?
+
+      sprint_rows.select { |survey| survey[:q1_team] == best_matching_team }
     end
 
     private

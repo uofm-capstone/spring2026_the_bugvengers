@@ -401,23 +401,7 @@ end
         client_rows = parsed[:rows]
         next if client_rows.blank?
 
-        sprint_rows = client_rows.select do |row|
-          row[:q3].to_s.strip.casecmp?(sprint.to_s.strip)
-        end
-
-        if sprint_rows.blank?
-          flags.append("client blank")
-          next
-        end
-
-        best_match = sprint_rows.max_by do |row|
-          next 0.0 if row[:q1_team].blank?
-
-          similarities = compare_strings(team.to_s, row[:q1_team].to_s)
-          (similarities[:jaro_winkler].to_f + similarities[:levenshtein].to_f) / 2.0
-        end
-
-        team_rows = sprint_rows.select { |row| row[:q1_team] == best_match[:q1_team] }
+        team_rows = best_matching_team_rows(client_rows: client_rows, team: team, sprint: sprint)
         flags.append("client blank") if team_rows.blank?
       end
     rescue => e

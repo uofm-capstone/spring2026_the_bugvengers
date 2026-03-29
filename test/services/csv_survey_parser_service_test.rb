@@ -1,6 +1,7 @@
 require "test_helper"
 
 class CSVSurveyParserServiceTest < ActiveSupport::TestCase
+  # Verifies real sample CSV produces both grouped team output and respondent details.
   test "parses client_feedback csv into grouped dataset" do
     file_path = Rails.root.join("client_feedback.csv")
 
@@ -23,6 +24,7 @@ class CSVSurveyParserServiceTest < ActiveSupport::TestCase
     refute_nil scale_response
   end
 
+  # Malformed CSV should be handled safely with errors populated, not exceptions.
   test "returns empty dataset for malformed csv" do
     malformed_csv = "Q1,Q3,Q7\n\"broken,Sprint 2,Feedback"
 
@@ -32,6 +34,7 @@ class CSVSurveyParserServiceTest < ActiveSupport::TestCase
     refute_empty result[:errors]
   end
 
+  # Q7 is required by the parsing plan for feedback extraction.
   test "returns empty dataset when q7 is missing" do
     csv_string = <<~CSV
       Q1,Q3,Q6
@@ -46,6 +49,7 @@ class CSVSurveyParserServiceTest < ActiveSupport::TestCase
     assert_includes result[:errors].join(" "), "Q7"
   end
 
+  # Team fallback keeps parse output usable when team field is missing.
   test "falls back to Unknown Team when team is missing" do
     csv_string = <<~CSV
       Q1,Q3,Q7
@@ -61,6 +65,7 @@ class CSVSurveyParserServiceTest < ActiveSupport::TestCase
     assert_equal ["Need faster updates"], result[:dataset][0][:responses]
   end
 
+  # Empty Q7 rows should be ignored to avoid polluting LLM input.
   test "skips rows with blank q7 feedback" do
     csv_string = <<~CSV
       Q1,Q3,Q7

@@ -5,6 +5,7 @@ module ClientScoreHelper
       #
 
       def calculate_score(matching_row, performance_columns)
+        # Convert each q2_* client evaluation response to numeric score.
         performance_scores = performance_columns.map do |col|
           response = matching_row[col]
           performance_to_score(response)
@@ -22,15 +23,18 @@ module ClientScoreHelper
       end
 
       def get_client_score(semester, team, sprint)
+        # Restricts fuzzy team matching to reasonably close strings only.
         similarity_threshold = 0.1  # Adjust this for team matching as needed
 
         semester.client_csv.open do |tempfile|
           begin
             # Reuse centralized parsing rules (Qualtrics rows, metadata skipping, normalization).
             parsed = CSVSurveyParserService.new(file: tempfile).parse
+            # Hard parse failure: no rows available, return user-facing error string.
             return "Error! Unable to read sponsor data." if parsed[:errors].present? && parsed[:rows].blank?
 
             table = parsed[:rows]
+            # Valid parse but no usable rows for scoring.
             return "No Score" if table.blank?
 
             # Performance columns remain q2_* fields used by existing scoring logic.
@@ -48,6 +52,7 @@ module ClientScoreHelper
               # Calculate Levenshtein distance for team names
               team_distance = Levenshtein.distance(row[team_column].to_s.strip.downcase, team.strip.downcase).to_f / [row[team_column].to_s.length, team.length].max
 
+              # Lower distance means a closer team name match.
               if team_distance < smallest_distance && team_distance < similarity_threshold
                 smallest_distance = team_distance
                 best_match = row

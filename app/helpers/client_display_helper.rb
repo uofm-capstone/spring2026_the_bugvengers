@@ -73,13 +73,16 @@ module ClientDisplayHelper
           # q2_* prompt labels are extracted from the second CSV row by the service.
           full_questions = parsed[:full_questions]
 
+          # Used by helper/view rendering to map q* keys to visible question labels.
           @client_question_titles = client_data_raw[0]&.select { |key, _| key.to_s.start_with?('q') } || {}
 
           # Preserve prior behavior: select one best-matching team within the requested sprint.
+          # Match team name fuzzily because user-facing team names may not exactly match CSV text.
           cliSurvey = best_matching_team_rows(client_rows: client_data_raw, team: team, sprint: sprint)
           cliSurvey.map! { |survey| survey.select { |key, _| key.to_s.start_with?('q') } }
 
 
+          # Flag feeds warning banners in team/status pages.
           if cliSurvey.blank?
             flags.append("client blank")
           end
@@ -100,6 +103,7 @@ module ClientDisplayHelper
     # Shared matcher used by both team page rendering and semester status flags.
     # It narrows rows by sprint, then chooses the closest team name match.
     def best_matching_team_rows(client_rows:, team:, sprint:)
+      # Step 1: restrict comparison to the target sprint.
       sprint_rows = client_rows.select do |row|
         row[:q3].to_s.strip.casecmp?(sprint.to_s.strip)
       end
@@ -108,6 +112,7 @@ module ClientDisplayHelper
       best_matching_team = nil
       max_similarity = 0.0
 
+      # Step 2: choose the best team name match using averaged string similarity metrics.
       sprint_rows.each do |client_survey|
         next if client_survey[:q1_team].blank? || client_survey[:q1_team].start_with?('{')
 
@@ -120,6 +125,7 @@ module ClientDisplayHelper
         end
       end
 
+      # Step 3: return all rows for that best-matching team in the sprint.
       return [] if best_matching_team.blank?
 
       sprint_rows.select { |survey| survey[:q1_team] == best_matching_team }

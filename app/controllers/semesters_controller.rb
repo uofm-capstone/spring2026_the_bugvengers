@@ -392,6 +392,7 @@ end
 
     begin
       semester.client_csv.open do |tempClient|
+        # Reuse the centralized parser so status flags follow the same CSV rules as team/detail views.
         parsed = CSVSurveyParserService.new(file: tempClient).parse
         if parsed[:errors].present?
           flags.append("client csv error")
@@ -401,6 +402,7 @@ end
         client_rows = parsed[:rows]
         next if client_rows.blank?
 
+        # Uses fuzzy team matching scoped to sprint to mirror team page behavior.
         team_rows = best_matching_team_rows(client_rows: client_rows, team: team, sprint: sprint)
         flags.append("client blank") if team_rows.blank?
       end

@@ -4,6 +4,7 @@ require "active_support/core_ext/object/blank"
 
 require_relative "../../app/services/csv_survey_parser_service"
 
+# DB-independent parser checks for environments where Rails test DB auth is unavailable.
 class CSVSurveyParserServiceStandaloneTest < Minitest::Test
   ROOT = File.expand_path("../..", __dir__)
 
@@ -26,6 +27,7 @@ class CSVSurveyParserServiceStandaloneTest < Minitest::Test
     assert_includes first_team[:responses], "nope :)"
   end
 
+  # Parser should fail gracefully on malformed source data.
   def test_handles_malformed_csv_without_crashing
     malformed_csv = "Q1,Q3,Q7\n\"broken,Sprint 2,Feedback"
 
@@ -35,6 +37,7 @@ class CSVSurveyParserServiceStandaloneTest < Minitest::Test
     refute_empty result[:errors]
   end
 
+  # Missing Q7 should return a structured error because Q7 is required feedback.
   def test_reports_missing_q7_column
     csv_string = <<~CSV
       Q1,Q3,Q6
@@ -49,6 +52,7 @@ class CSVSurveyParserServiceStandaloneTest < Minitest::Test
     assert_includes result[:errors].join(" "), "Q7"
   end
 
+  # Missing team still yields valid output using the Unknown Team fallback.
   def test_uses_unknown_team_fallback
     csv_string = <<~CSV
       Q1,Q3,Q7

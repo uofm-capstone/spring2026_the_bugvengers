@@ -51,6 +51,7 @@ class CSVSurveyParserService
       return empty_result(warnings: warnings, errors: errors)
     end
 
+    # Team/sprint columns are detected from question text first, then header fallbacks.
     team_index = detect_team_index(headers, question_row)
     sprint_index = detect_sprint_index(headers, question_row)
     q7_index = detect_index(headers, FEEDBACK_HEADER)
@@ -61,11 +62,13 @@ class CSVSurveyParserService
       return empty_result(warnings: warnings, errors: errors)
     end
 
+    # Full question text is used by the UI to show readable prompts for q2_* items.
     full_questions = build_full_questions(headers, question_row)
     grouped = Hash.new { |h, k| h[k] = [] }
     rows = []
     respondents = []
 
+    # Prefer RecordedDate when available, otherwise use StartDate as a best-effort timestamp.
     submitted_at_index = detect_normalized_index(headers, "recordeddate") || detect_normalized_index(headers, "startdate")
     response_id_index = detect_normalized_index(headers, "responseid")
 
@@ -89,6 +92,7 @@ class CSVSurveyParserService
         respondent_id = response_id_index.nil? ? nil : cleaned[response_id_index]
         submitted_at = submitted_at_index.nil? ? nil : cleaned[submitted_at_index]
 
+        # Respondent-level output keeps one object per survey submission row.
         respondents << {
           respondent_id: respondent_id,
           responses: question_responses,
@@ -99,6 +103,7 @@ class CSVSurveyParserService
           }
         }
 
+        # Legacy row shape is preserved so existing helpers/views do not break.
         rows << {
           team: team_name,
           sprint: sprint,
@@ -115,6 +120,7 @@ class CSVSurveyParserService
       end
     end
 
+    # LLM payload is intentionally compact and grouped by team.
     dataset = grouped.map do |team, responses|
       { team: team, responses: responses }
     end
@@ -135,12 +141,14 @@ class CSVSurveyParserService
 
   private
 
+  # Parses raw CSV rows with encoding protection and pushes parse issues into errors.
   def parse_rows(errors)
     csv_source = load_source
     return [] if csv_source.nil? || csv_source.strip.empty?
 
     # Defensive encoding conversion prevents hard crashes on mixed encodings.
     encoded = csv_source.encode("UTF-8", invalid: :replace, undef: :replace, replace: "")
+    # We parse raw rows first (without header coercion) because Qualtrics uses multi-header rows.
     CSV.parse(encoded, headers: false)
   rescue CSV::MalformedCSVError => e
     errors << "Malformed CSV: #{e.message}"
@@ -152,6 +160,7 @@ class CSVSurveyParserService
     []
   end
 
+  # Loads CSV content from a raw string, IO-like object, or filesystem path.
   def load_source
     return @csv_string if @csv_string.present?
     return nil if @file.nil?
@@ -167,6 +176,7 @@ class CSVSurveyParserService
     nil
   end
 
+  # Trims values and normalizes blank strings to nil for consistent downstream checks.
   def clean_row_values(row)
     row.map do |value|
       cleaned = value.to_s.strip
@@ -174,6 +184,7 @@ class CSVSurveyParserService
     end
   end
 
+  # Builds a normalized symbol-key row hash and preserves key aliases used by existing helpers.
   def build_normalized_row(headers, values, team_index, _sprint_index)
     normalized_headers = deduplicated_normalized_headers(headers)
     row_hash = {}
@@ -191,6 +202,7 @@ class CSVSurveyParserService
     row_hash
   end
 
+  # Converts original headers to deterministic snake_case keys and disambiguates duplicates.
   def deduplicated_normalized_headers(headers)
     seen = Hash.new(0)
 
@@ -204,14 +216,17 @@ class CSVSurveyParserService
     end
   end
 
+  # Normalizes a single header value into snake_case.
   def normalize_header(header)
     header.to_s.downcase.gsub(/[^a-z0-9]+/, "_").gsub(/\A_+|_+\z/, "")
   end
 
+  # Checks whether a normalized header belongs to ignored system/metadata fields.
   def ignored_header?(header)
     IGNORE_HEADERS.include?(header.to_s)
   end
 
+  # Extracts typed question/answer objects for supported response columns.
   def build_question_responses(headers, question_row, values)
     responses = []
 
@@ -221,6 +236,7 @@ class CSVSurveyParserService
       answer = values[index]
       next if answer.nil?
 
+      # Question text falls back to header code if the descriptive row is missing.
       responses << {
         question: question_row[index].to_s.strip.presence || header,
         answer: answer,
@@ -231,7 +247,9 @@ class CSVSurveyParserService
     responses
   end
 
+  # Infers response type for downstream processing (scale/text/multiple_choice).
   def infer_response_type(header, answer)
+    # q2_* columns are Likert-style scale responses in current survey schema.
     return :scale if header.to_s.match?(/\Aq2_\d+\z/i)
 
     normalized = answer.to_s.downcase
@@ -241,6 +259,7 @@ class CSVSurveyParserService
     :text
   end
 
+  # Builds a question-code to full prompt map for q2_* fields used by the UI.
   def build_full_questions(headers, question_row)
     headers.each_with_index.with_object({}) do |(header, index), acc|
       next unless header.to_s.match?(/\Aq2_\d+\z/i)
@@ -250,28 +269,35 @@ class CSVSurveyParserService
     end
   end
 
+  # Detects the team column index using prompt text first, with header fallback.
   def detect_team_index(headers, question_row)
+    # Prefer descriptive prompt matching because some exports repeat q1 headers.
     question_index = question_row.index { |value| value.to_s.match?(TEAM_HINT) }
     return question_index unless question_index.nil?
 
     detect_index(headers, /\Aq1\z/i)
   end
 
+  # Detects the sprint column index using prompt text first, with header fallback.
   def detect_sprint_index(headers, question_row)
+    # Prefer descriptive prompt matching to avoid depending on fixed column order.
     question_index = question_row.index { |value| value.to_s.match?(SPRINT_HINT) }
     return question_index unless question_index.nil?
 
     detect_index(headers, /\Aq3\z/i)
   end
 
+  # Returns the first header index that matches a regex pattern.
   def detect_index(headers, regex)
     headers.find_index { |header| header.to_s.match?(regex) }
   end
 
+  # Finds the index of a header by comparing normalized header text.
   def detect_normalized_index(headers, normalized_name)
     headers.find_index { |header| normalize_header(header) == normalized_name }
   end
 
+  # Skips blank rows and embedded metadata rows that are not real submissions.
   def skip_row?(row)
     return true if row.nil? || row.all? { |value| value.to_s.strip.empty? }
 
@@ -279,6 +305,7 @@ class CSVSurveyParserService
     row.any? { |value| value.to_s.include?("\"ImportId\"") }
   end
 
+  # Standard empty return shape used for hard-failure parse paths.
   def empty_result(warnings:, errors:)
     { dataset: [], rows: [], full_questions: {}, respondents: [], warnings: warnings, errors: errors }
   end

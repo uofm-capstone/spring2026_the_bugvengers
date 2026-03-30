@@ -298,10 +298,11 @@ class LlmService
   # Parses Ollama HTTP response and safely falls back to raw text when needed.
   def parse_http_response(response:, endpoint:, elapsed_ms:)
     status = response.code.to_i
-    parsed_body = safe_json_parse(response.body)
+    body_text = response.body.to_s
+    parsed_body = safe_json_parse(body_text)
 
     unless status.between?(200, 299)
-      details = parsed_body.is_a?(Hash) ? parsed_body : response.body.to_s.truncate(300)
+      details = parsed_body.is_a?(Hash) ? parsed_body : body_text.truncate(300)
       return error_result(
         code: "llm_http_error",
         message: "LLM unavailable",
@@ -309,17 +310,36 @@ class LlmService
       )
     end
 
-    raw_output = extract_llm_output(parsed_body, endpoint)
-    if raw_output.blank?
-      return error_result(
-        code: "invalid_llm_response",
-        message: "LLM unavailable",
-        details: "Response missing expected output field"
+    # For successful responses we attempt multiple parse paths in order:
+    # 1) expected Ollama fields (response/message.content)
+    # 2) full parsed JSON body (if no expected field exists)
+    # 3) raw HTTP body text fallback
+    extracted_output = extract_llm_output(parsed_body, endpoint)
+    if extracted_output.nil? && parsed_body.is_a?(Hash)
+      return success_result(
+        data: parsed_body,
+        meta: {
+          endpoint: endpoint.to_sym,
+          model: @model,
+          status: status,
+          duration_ms: elapsed_ms,
+          parsed_as: "json"
+        }
       )
     end
 
-    structured = safe_json_parse(raw_output)
-    data = structured.nil? ? raw_output : structured
+    extracted_output = body_text if extracted_output.nil?
+    if extracted_output.blank?
+      return error_result(
+        code: "invalid_llm_response",
+        message: "LLM unavailable",
+        details: "Response body was empty"
+      )
+    end
+
+    # Some models return JSON as a string in `response`; decode when possible.
+    structured = safe_json_parse(extracted_output)
+    data = structured.nil? ? extracted_output : structured
 
     success_result(
       data: data,
@@ -334,14 +354,18 @@ class LlmService
   end
 
   def extract_llm_output(parsed_body, endpoint)
-    return parsed_body.to_s unless parsed_body.is_a?(Hash)
+    return nil unless parsed_body.is_a?(Hash)
 
     if endpoint.to_sym == :chat
       message = fetch_key(parsed_body, :message)
-      return fetch_key(message, :content).to_s if message.is_a?(Hash)
+      chat_content = fetch_key(message, :content).to_s if message.is_a?(Hash)
+      return chat_content if chat_content.present?
     end
 
-    fetch_key(parsed_body, :response).to_s
+    generated_text = fetch_key(parsed_body, :response).to_s
+    return generated_text if generated_text.present?
+
+    nil
   end
 
   def safe_json_parse(value)

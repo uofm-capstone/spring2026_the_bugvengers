@@ -115,15 +115,29 @@ class LlmServiceStandaloneTest < Minitest::Test
     end
   end
 
-  def test_returns_invalid_response_error_for_non_json_http_body
+  def test_falls_back_to_raw_text_for_non_json_http_body
     service = build_service
     fake_response = FakeHttpResponse.new(200, "not-json-response")
 
     HTTParty.stub(:post, fake_response) do
       result = service.analyze(input: ["Client feedback"])
 
-      assert_equal false, result[:ok]
-      assert_equal "invalid_llm_response", result.dig(:error, :code)
+      assert_equal true, result[:ok]
+      assert_equal "not-json-response", result[:data]
+      assert_equal "text", result.dig(:meta, :parsed_as)
+    end
+  end
+
+  def test_returns_structured_json_when_body_lacks_ollama_response_field
+    service = build_service
+    fake_response = FakeHttpResponse.new(200, { summary: "positive", risks: [] }.to_json)
+
+    HTTParty.stub(:post, fake_response) do
+      result = service.analyze(input: ["Client feedback"])
+
+      assert_equal true, result[:ok]
+      assert_equal "positive", result.dig(:data, "summary")
+      assert_equal "json", result.dig(:meta, :parsed_as)
     end
   end
 

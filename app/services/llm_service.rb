@@ -12,6 +12,7 @@ require "active_support/core_ext/string/filters"
 # LlmService sends normalized survey feedback to an Ollama-hosted LLM and
 # returns a safe, structured result that never raises to callers.
 class LlmService
+  # Reasonable defaults for local VM-hosted Ollama usage.
   DEFAULT_MODEL = "gemma:2b"
   DEFAULT_TIMEOUT_SECONDS = 20
   ERROR_DETAIL_LIMIT = 300
@@ -25,6 +26,8 @@ class LlmService
     include_scale_summary: false,
     logger: nil
   )
+    # Values are normalized once at construction so downstream logic can assume
+    # consistent strings and integer timeout values.
     @api_url = api_url.to_s.strip
     @model = model.to_s.strip
     @timeout_seconds = timeout_seconds
@@ -76,6 +79,7 @@ class LlmService
 
   private
 
+  # Sends prompt payload to Ollama and delegates result handling to parser logic.
   def perform_request(final_prompt:, endpoint:, normalized:)
     started_at = Process.clock_gettime(Process::CLOCK_MONOTONIC)
     url = endpoint_url(endpoint)
@@ -134,6 +138,7 @@ class LlmService
   end
 
   def dataset_array?(input)
+    # Parser dataset shape: [{ team: "...", responses: ["..."] }]
     input.first.is_a?(Hash) && (fetch_key(input.first, :responses).present? || fetch_key(input.first, :team).present?)
   end
 
@@ -279,6 +284,7 @@ class LlmService
     "#{base}#{path}"
   end
 
+  # Builds the exact JSON payload Ollama expects for each endpoint mode.
   def request_payload(endpoint:, prompt:)
     if endpoint.to_sym == :chat
       {
@@ -368,6 +374,7 @@ class LlmService
     nil
   end
 
+  # Returns parsed JSON object on success; nil means caller should use text fallback.
   def safe_json_parse(value)
     return nil if value.blank?
 
@@ -377,6 +384,7 @@ class LlmService
   end
 
   def fetch_key(hash, key)
+    # Supports symbol and string keys because upstream parser callers may pass either.
     return nil unless hash.is_a?(Hash)
 
     hash[key] || hash[key.to_s]
@@ -442,6 +450,7 @@ class LlmService
     }
   end
 
+  # Uses Rails logger when available, otherwise keeps standalone tests/script usage simple.
   def default_logger
     if defined?(Rails) && Rails.respond_to?(:logger) && Rails.logger
       Rails.logger

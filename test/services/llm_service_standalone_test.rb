@@ -6,8 +6,10 @@ require_relative "../../app/services/llm_service"
 
 # DB-independent LLM service checks for environments where Rails test DB auth is unavailable.
 class LlmServiceStandaloneTest < Minitest::Test
+  # Minimal response object shape needed by the service (`code` + `body`).
   FakeHttpResponse = Struct.new(:code, :body)
 
+  # Shared builder keeps tests focused on behavior rather than setup noise.
   def build_service(**overrides)
     defaults = {
       api_url: "http://34.10.73.251:11434",
@@ -16,6 +18,8 @@ class LlmServiceStandaloneTest < Minitest::Test
 
     LlmService.new(**defaults.merge(overrides))
   end
+
+  # Configuration and transport safety checks.
 
   def test_returns_configuration_error_when_api_url_missing
     service = build_service(api_url: nil)
@@ -164,6 +168,8 @@ class LlmServiceStandaloneTest < Minitest::Test
     end
   end
 
+  # Response parsing fallbacks and normalization behavior.
+
   def test_falls_back_to_raw_text_for_non_json_http_body
     service = build_service
     fake_response = FakeHttpResponse.new(200, "not-json-response")
@@ -283,6 +289,8 @@ class LlmServiceStandaloneTest < Minitest::Test
     assert_includes prompt, "- Strong communication"
     assert_includes prompt, "- Need clearer estimates"
   end
+
+  # Outbound request contract checks for Ollama API compatibility.
 
   def test_posts_generate_payload_with_model_prompt_and_stream_false
     service = build_service(model: "gemma:2b")

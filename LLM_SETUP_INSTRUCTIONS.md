@@ -6,7 +6,7 @@ This document explains how to set up a **local Large Language Model (LLM)** usin
 
 This setup was implemented to:
 
-* Avoid external APIs (data privacy requirement)  
+* Avoid external APIs  
 * Keep all processing within the same GCP project as the deployed app  
 * Enable future LLM-based analysis of survey CSV data
 
@@ -82,7 +82,7 @@ Analyze sentiment: communication could be improved
 
 ---
 
-## Part 3 — Enable Internal API Access (Secure Setup)
+## Part 3 — Enable API Access 
 
 ### 1\. Start Ollama API server
 
@@ -92,19 +92,7 @@ This allows the model to accept HTTP requests.
 
 ---
 
-### 2\. Get VM Internal IP
-
-hostname \-I
-
-Example:
-
-10.x.x.x
-
-Save this for later use.
-
----
-
-### 3\. Create Firewall Rule (Internal Only)
+### 2\. Create Firewall Rule to Allow Ollama Traffic
 
 Navigate to:
 
@@ -112,25 +100,29 @@ VPC Network → Firewall → Create Firewall Rule
 
 Configure:
 
-* **Name:** allow-ollama-internal  
-    
-* **Direction:** Ingress  
-    
-* **Targets:** All instances (or use a VM tag)  
-    
-* **Source IP ranges:**  
-    
-  10.0.0.0/8  
-    
-* **Protocols and ports:**  
-    
-  tcp:11434
+* **Name**: allow-ollama
 
-This allows only internal traffic to reach Ollama.
+* **Direction**: Ingress
+
+* **Action**: Allow
+
+* **Targets**: Specified target tags
+
+* **Target tags**: http-server
+(or use a dedicated tag such as ollama-server if preferred)
+
+* **Source IPv4 ranges**: 0.0.0.0/0
+(acceptable for development/testing; could be restricted later if you prefer)
+
+* **Protocols and ports**: tcp:11434
+
+This firewall rule allows external requests to reach Ollama on port 11434.
+
+Note: In our setup, the VM already had the network tag http-server, so the allow-ollama rule targeted that existing tag.
 
 ---
 
-### 4\. Create Serverless VPC Connector
+### 3\. Create Serverless VPC Connector
 
 Navigate to:
 
@@ -148,7 +140,7 @@ Configure:
 
 ---
 
-### 5\. Attach Connector to Cloud Run
+### 4\. Attach Connector to Cloud Run
 
 Navigate to:
 
@@ -169,27 +161,61 @@ Deploy the revision.
 
 ---
 
-## Testing the API
+## Part 4 - Testing the API
 
 ### From the VM (local test):
 
-curl http://localhost:11434/api/generate \\
+**From Inside the VM**:
+`curl http://localhost:11434/api/tags`
 
-  \-d '{
+**From Outside the VM**:
+`curl http://<EXTERNAL_IP>:11434/api/tags`
 
-    "model": "gemma:2b",
+If configured correctly, both commands should return JSON containing the installed Ollama models.
+---
+## Part 5 - Making Ollama Persistent Across SSH Sessions
+Starting Ollama manually with:
 
-    "prompt": "Say hello"
+`OLLAMA_HOST=0.0.0.0 ollama serve`
 
-  }'
+works for testing, but it only stays alive while that shell session remains open. To make Ollama persistent, configure the existing systemd service.
+
+### \1. Create a systemd override
+`sudo mkdir -p /etc/systemd/system/ollama.service.d
+ sudo tee /etc/systemd/system/ollama.service.d/override.conf > /dev/null <<'EOF 
+ [Service]
+ Environment="OLLAMA_HOST=0.0.0.0"
+ EOF`
+ 
+### \2. Reload and restart the service
+`sudo systemctl daemon-reload
+ sudo systemctl restart ollama`
+ 
+### \3. Verify the service
+`sudo systemctl status ollama
+ ss -tulnp | grep 11434`
+
+Expected output should show Ollama listening on either:
+
+0.0.0.0:11434
+
+or
+
+[::]:11434
+
+If it shows:
+
+127.0.0.1:11434
+
+then Ollama is only bound to localhost and will not be externally reachable.
 
 ---
 
-## Usage in Application (Future Work)
+## Usage in Application
 
-The Rails application will call the LLM using the VM’s internal IP:
+The Rails application will call the LLM using the VM’s external IP:
 
-http://10.x.x.x:11434/api/generate
+http://<external_ip>:11434/api/generate
 
 This will be implemented in a service class (e.g., `LlmService`).
 
@@ -204,22 +230,12 @@ This will be implemented in a service class (e.g., `LlmService`).
   Compute Engine → VM Instances → Stop  
     
 * Disk storage (\~$2/month) persists even when stopped
-
----
-
-## Security Notes
-
-* The LLM is **not exposed to the public internet**  
-* Access is restricted to internal GCP services  
-* Meets project requirement for **data privacy**
-
-Here’s a clean, well-formatted **Markdown version** you can paste directly into your README:
-
+* 
 ---
 
 ## Troubleshooting Common Connection Issues
 
-Even with a correct setup, networking issues can occur when connecting Cloud Run to VPC resources (e.g., VM running Ollama or Cloud SQL). Below are common problems and how to resolve them in case you run into any.
+Even with a correct setup, networking issues can occur when connecting Cloud Run to VPC resources (e.g., VM running Ollama or Cloud SQL). Below are common problems some of which we came across and how to resolve them in case you run into any.
 
 ---
 

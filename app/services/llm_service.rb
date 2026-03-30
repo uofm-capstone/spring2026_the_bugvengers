@@ -79,7 +79,10 @@ class LlmService
     url = endpoint_url(endpoint)
 
     body = request_payload(endpoint: endpoint, prompt: final_prompt)
-    headers = { "Content-Type" => "application/json" }
+    headers = {
+      "Content-Type" => "application/json",
+      "Accept" => "application/json"
+    }
 
     @logger.info(
       "LlmService request: endpoint=#{endpoint} model=#{@model} " \
@@ -267,13 +270,13 @@ class LlmService
   end
 
   def endpoint_url(endpoint)
-    base = @api_url.sub(%r{/$}, "")
-    case endpoint.to_sym
-    when :chat
-      "#{base}#{CHAT_PATH}"
-    else
-      "#{base}#{GENERATE_PATH}"
-    end
+    base = @api_url.to_s.sub(%r{/$}, "")
+
+    # If caller already provided a fully qualified endpoint path, keep it.
+    return base if base.match?(%r{/api/(generate|chat)\z})
+
+    path = endpoint.to_sym == :chat ? CHAT_PATH : GENERATE_PATH
+    "#{base}#{path}"
   end
 
   def request_payload(endpoint:, prompt:)

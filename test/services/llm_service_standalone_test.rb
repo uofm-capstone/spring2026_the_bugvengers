@@ -220,4 +220,74 @@ class LlmServiceStandaloneTest < Minitest::Test
     assert_includes prompt, "- Strong communication"
     assert_includes prompt, "- Need clearer estimates"
   end
+
+  def test_posts_generate_payload_with_model_prompt_and_stream_false
+    service = build_service(model: "gemma:2b")
+    captured_url = nil
+    captured_options = nil
+
+    post_stub = lambda do |url, options|
+      captured_url = url
+      captured_options = options
+      FakeHttpResponse.new(200, { response: "ok" }.to_json)
+    end
+
+    HTTParty.stub(:post, post_stub) do
+      result = service.analyze(input: ["Client feedback"])
+
+      assert_equal true, result[:ok]
+      assert_equal "http://34.10.73.251:11434/api/generate", captured_url
+      assert_equal "application/json", captured_options.dig(:headers, "Content-Type")
+      assert_equal "application/json", captured_options.dig(:headers, "Accept")
+
+      payload = JSON.parse(captured_options[:body])
+      assert_equal "gemma:2b", payload["model"]
+      assert payload["prompt"].is_a?(String)
+      assert_equal false, payload["stream"]
+    end
+  end
+
+  def test_posts_chat_payload_when_chat_endpoint_selected
+    service = build_service
+    captured_url = nil
+    captured_options = nil
+
+    post_stub = lambda do |url, options|
+      captured_url = url
+      captured_options = options
+      FakeHttpResponse.new(200, { message: { content: "chat ok" } }.to_json)
+    end
+
+    HTTParty.stub(:post, post_stub) do
+      result = service.analyze(input: ["Client feedback"], endpoint: :chat)
+
+      assert_equal true, result[:ok]
+      assert_equal "chat ok", result[:data]
+      assert_equal "http://34.10.73.251:11434/api/chat", captured_url
+
+      payload = JSON.parse(captured_options[:body])
+      assert_equal "gemma:2b", payload["model"]
+      assert_equal false, payload["stream"]
+      assert payload["messages"].is_a?(Array)
+      assert_equal "user", payload["messages"][0]["role"]
+      assert payload["messages"][0]["content"].is_a?(String)
+    end
+  end
+
+  def test_does_not_append_api_path_when_api_url_already_includes_generate
+    service = build_service(api_url: "http://34.10.73.251:11434/api/generate")
+    captured_url = nil
+
+    post_stub = lambda do |url, _options|
+      captured_url = url
+      FakeHttpResponse.new(200, { response: "ok" }.to_json)
+    end
+
+    HTTParty.stub(:post, post_stub) do
+      result = service.analyze(input: ["Client feedback"])
+
+      assert_equal true, result[:ok]
+      assert_equal "http://34.10.73.251:11434/api/generate", captured_url
+    end
+  end
 end

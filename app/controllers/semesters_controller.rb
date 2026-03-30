@@ -534,7 +534,7 @@ end
       status = card.status || "Unspecified"
       per_student_column_counts[status] += 1
       estimated_hours += numeric_field(card, "Time Estimate", "Estimate", "Estimated Hours")
-      time_spent_hours += numeric_field(card, "Time Spent", "Hours Spent", "Spent")
+      time_spent_hours += numeric_field(card, "Time Spent", "Time Taken", "Hours Spent", "Spent")
     end
 
     done_status_total = per_student_column_counts["Done"] + per_student_column_counts["Archived"] +
@@ -581,9 +581,9 @@ end
     total_count = columns.values.sum
 
     estimated_hours = sprint_cards.sum { |card| numeric_field(card, "Time Estimate", "Estimate", "Estimated Hours") }
-    time_spent_hours = sprint_cards.sum { |card| numeric_field(card, "Time Spent", "Hours Spent", "Spent") }
+    time_spent_hours = sprint_cards.sum { |card| numeric_field(card, "Time Spent", "Time Taken", "Hours Spent", "Spent") }
     cards_missing_time_spent = sprint_cards.count do |card|
-      done_in_any_sprint_status?(card.status) && numeric_field(card, "Time Spent", "Hours Spent", "Spent").zero?
+      done_in_any_sprint_status?(card.status) && numeric_field(card, "Time Spent", "Time Taken", "Hours Spent", "Spent").zero?
     end
     in_current_sprint = sprint_in_progress?(sprint)
 
@@ -649,9 +649,25 @@ end
       candidate_names.any? { |candidate| field_name.to_s.casecmp(candidate).zero? }
     end
 
+    # Fallback matching handles light naming variations such as
+    # "Time Taken (hrs)" vs "Time Taken".
+    if key.blank?
+      normalized_candidates = candidate_names.map { |name| normalize_field_name(name) }
+      key = fields.keys.find do |field_name|
+        normalized_field = normalize_field_name(field_name)
+        normalized_candidates.any? do |candidate|
+          normalized_field.include?(candidate) || candidate.include?(normalized_field)
+        end
+      end
+    end
+
     return 0.0 if key.blank?
 
     fields[key].to_f
+  end
+
+  def normalize_field_name(value)
+    value.to_s.downcase.gsub(/[^a-z0-9]/, "")
   end
 
   def cards_for_sprint(cards, sprint)

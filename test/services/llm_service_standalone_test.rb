@@ -1,5 +1,6 @@
 require "minitest/autorun"
 require "logger"
+require "json"
 
 require_relative "../../app/services/llm_service"
 
@@ -180,5 +181,43 @@ class LlmServiceStandaloneTest < Minitest::Test
 
     assert_equal false, result[:ok]
     assert_equal "no_feedback", result.dig(:error, :code)
+  end
+
+  def test_uses_direct_prompt_without_modifying_text
+    service = build_service
+    provided_prompt = "  Keep this spacing and wording exactly.  "
+    captured_prompt = nil
+
+    post_stub = lambda do |_url, options|
+      payload = JSON.parse(options[:body])
+      captured_prompt = payload["prompt"]
+      FakeHttpResponse.new(200, { response: "ok" }.to_json)
+    end
+
+    HTTParty.stub(:post, post_stub) do
+      result = service.analyze(input: ["Client feedback"], prompt: provided_prompt)
+
+      assert_equal true, result[:ok]
+      assert_equal provided_prompt, captured_prompt
+    end
+  end
+
+  def test_builds_default_prompt_grouped_by_team
+    service = build_service
+    prompt = service.preview_prompt(
+      input: {
+        dataset: [
+          {
+            team: "Team A",
+            responses: ["Strong communication", "Need clearer estimates"]
+          }
+        ]
+      }
+    )
+
+    assert_includes prompt, "Analyze this client survey feedback."
+    assert_includes prompt, "Team: Team A"
+    assert_includes prompt, "- Strong communication"
+    assert_includes prompt, "- Need clearer estimates"
   end
 end

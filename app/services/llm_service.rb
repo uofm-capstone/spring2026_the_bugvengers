@@ -53,7 +53,7 @@ class LlmService
       )
     end
 
-    final_prompt = prompt.to_s.strip.presence || build_default_prompt(normalized)
+    final_prompt = resolve_prompt(prompt: prompt, normalized: normalized)
     perform_request(final_prompt: final_prompt, endpoint: endpoint, normalized: normalized)
   rescue StandardError => e
     @logger.error("LlmService analyze failed: #{e.class} - #{e.message}")
@@ -63,6 +63,13 @@ class LlmService
   # Convenience method when callers already have a plain string array.
   def analyze_responses(responses, prompt: nil, endpoint: :generate)
     analyze(input: responses, prompt: prompt, endpoint: endpoint)
+  end
+
+  # Exposes final prompt construction for console usage and prompt tuning work.
+  # This keeps prompt iteration separate from HTTP/network behavior.
+  def preview_prompt(input:, prompt: nil)
+    normalized = normalize_input(input)
+    resolve_prompt(prompt: prompt, normalized: normalized)
   end
 
   private
@@ -230,6 +237,14 @@ class LlmService
         dropped_count: Array.wrap(strings).size - cleaned.size
       }
     }
+  end
+
+  # Direct prompt strings are sent as-is so prompt writers have full control.
+  # If prompt is omitted, the default prompt template is used.
+  def resolve_prompt(prompt:, normalized:)
+    return prompt if prompt.is_a?(String) && prompt.present?
+
+    build_default_prompt(normalized)
   end
 
   # Keeps prompt logic simple and easy to modify for future prompt-refinement tasks.

@@ -1,6 +1,6 @@
 <h1>Welcome to TAG!</h1>
 
-<p>Hello <%= @user.full_name || @user.email %>,</p>
+<p>Hello <%= @user.student&.full_name || @user.email %>,</p>
 
 <p>Your account has been created. Use the details below to login for the first time.</p>
 

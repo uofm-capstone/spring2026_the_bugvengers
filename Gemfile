@@ -103,3 +103,5 @@ gem 'levenshtein'
 gem 'fuzzy-string-match'
 
 gem 'cancancan'
+
+gem 'sendgrid-ruby'

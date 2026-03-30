@@ -1,6 +1,6 @@
 Welcome to TAG!
 
-Hello <%= @user.full_name || @user.email %>,
+Hello <%= @user.student&.full_name || @user.email %>,
 
 Your account has been created. Use the details below to log in for the first time.
 

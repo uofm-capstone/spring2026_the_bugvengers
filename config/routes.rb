@@ -69,5 +69,8 @@ Rails.application.routes.draw do
   resources :semesters do
     resources :repositories, only: [:new, :create, :show], controller: 'semesters/repositories'
   end
+
+  get 'users/forced_password_change', to: 'users/forced_password_changes#edit', as: 'forced_password_change'
+  patch 'users/forced_password_change', to: 'users/forced_password_changes#update'
 end
 

@@ -380,7 +380,8 @@ def status
           total_cards: team_metric[:total_cards],
           total_estimate: team_metric[:estimated_hours],
           total_spent: team_metric[:time_spent_hours],
-          cards_missing_spent: team_metric[:cards_missing_time_spent]
+          cards_missing_spent: team_metric[:cards_missing_time_spent],
+          card_time_samples: sprint_cards.map { |card| card_time_sample(card) }
         }
       end
 
@@ -687,6 +688,37 @@ end
       "Actual Time",
       "Time Logged"
     )
+  end
+
+  def card_time_sample(card)
+    {
+      title: card.title,
+      status: card.status,
+      assignees: Array(card.assignees),
+      estimate_field: matched_field_name(card, "Time Estimate", "Time Estiamte", "Estimate", "Estimated Hours", "Estimated Time"),
+      estimate_value: estimate_value(card),
+      taken_field: matched_field_name(card, "Time Spent", "Time Taken", "Hours Spent", "Spent", "Actual Time", "Time Logged"),
+      taken_value: spent_value(card)
+    }
+  end
+
+  def matched_field_name(card, *candidate_names)
+    fields = card.fields || {}
+    key = fields.keys.find do |field_name|
+      candidate_names.any? { |candidate| field_name.to_s.casecmp(candidate).zero? }
+    end
+
+    if key.blank?
+      normalized_candidates = candidate_names.map { |name| normalize_field_name(name) }
+      key = fields.keys.find do |field_name|
+        normalized_field = normalize_field_name(field_name)
+        normalized_candidates.any? do |candidate|
+          normalized_field.include?(candidate) || candidate.include?(normalized_field)
+        end
+      end
+    end
+
+    key
   end
 
   def normalize_field_name(value)

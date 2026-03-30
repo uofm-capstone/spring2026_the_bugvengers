@@ -15,9 +15,22 @@
           <span>Window: <%= payload[:start_date] %> - <%= payload[:end_date] %></span>
           <span>Total Cards: <%= payload[:total_cards] %></span>
           <span>Estimate: <%= payload[:total_estimate] %>h</span>
-          <span>Spent: <%= payload[:total_spent] %>h</span>
-          <span>Done Missing TS: <%= payload[:cards_missing_spent] %></span>
+          <span>Taken: <%= payload[:total_spent] %>h</span>
+          <span>Done Missing TT: <%= payload[:cards_missing_spent] %></span>
         </div>
+
+        <details class="github-inspector-card-samples">
+          <summary><%= sprint_name %> card TE/TT values</summary>
+          <% Array(payload[:card_time_samples]).each do |sample| %>
+            <div class="github-inspector-sprint">
+              <strong><%= sample[:title] %></strong>
+              <span>Status: <%= sample[:status] || "N/A" %></span>
+              <span>Assignees: <%= Array(sample[:assignees]).join(", ").presence || "none" %></span>
+              <span>TE: <%= sample[:estimate_value] %> (<%= sample[:estimate_field] || "no field" %>)</span>
+              <span>TT: <%= sample[:taken_value] %> (<%= sample[:taken_field] || "no field" %>)</span>
+            </div>
+          <% end %>
+        </details>
       <% end %>
     </div>
   <% end %>

@@ -4,6 +4,7 @@ require "json"
 require "httparty"
 require "timeout"
 require "logger"
+require "uri"
 require "active_support/core_ext/object/blank"
 require "active_support/core_ext/array/wrap"
 require "active_support/core_ext/string/filters"
@@ -13,6 +14,7 @@ require "active_support/core_ext/string/filters"
 class LlmService
   DEFAULT_MODEL = "gemma:2b"
   DEFAULT_TIMEOUT_SECONDS = 20
+  ERROR_DETAIL_LIMIT = 300
   GENERATE_PATH = "/api/generate"
   CHAT_PATH = "/api/chat"
 
@@ -100,10 +102,8 @@ class LlmService
     @logger.info("LlmService response: status=#{response.code} duration_ms=#{elapsed_ms}")
 
     parse_http_response(response: response, endpoint: endpoint, elapsed_ms: elapsed_ms)
-  rescue Net::OpenTimeout, Net::ReadTimeout, Timeout::Error => e
-    error_result(code: "llm_timeout", message: "LLM unavailable", details: e.message)
-  rescue Errno::ECONNREFUSED, SocketError, Errno::EHOSTUNREACH, Errno::ECONNRESET => e
-    error_result(code: "llm_unreachable", message: "LLM unavailable", details: e.message)
+  rescue StandardError => e
+    handle_transport_error(e)
   end
 
   # Converts supported input shapes into a clean array of text strings plus stats.
@@ -302,7 +302,7 @@ class LlmService
     parsed_body = safe_json_parse(body_text)
 
     unless status.between?(200, 299)
-      details = parsed_body.is_a?(Hash) ? parsed_body : body_text.truncate(300)
+      details = parsed_body.is_a?(Hash) ? parsed_body : body_text.truncate(ERROR_DETAIL_LIMIT)
       return error_result(
         code: "llm_http_error",
         message: "LLM unavailable",
@@ -393,6 +393,37 @@ class LlmService
 
   def config_error(message)
     error_result(code: "configuration_error", message: message)
+  end
+
+  # Maps request-level exceptions to stable, caller-safe error codes.
+  def handle_transport_error(error)
+    code = transport_error_code(error)
+    @logger.error("LlmService transport failure: #{error.class} - #{error.message}")
+    error_result(code: code, message: "LLM unavailable", details: safe_error_detail(error.message))
+  end
+
+  def transport_error_code(error)
+    case error
+    when Net::OpenTimeout, Net::ReadTimeout, Timeout::Error, Errno::ETIMEDOUT
+      "llm_timeout"
+    when Errno::ECONNREFUSED, SocketError, Errno::EHOSTUNREACH, Errno::ECONNRESET
+      "llm_unreachable"
+    when URI::InvalidURIError
+      "invalid_llm_url"
+    else
+      # HTTParty and SSL errors usually indicate transport-level service issues.
+      if defined?(OpenSSL::SSL::SSLError) && error.is_a?(OpenSSL::SSL::SSLError)
+        "llm_ssl_error"
+      elsif defined?(HTTParty::Error) && error.is_a?(HTTParty::Error)
+        "llm_transport_error"
+      else
+        "llm_service_error"
+      end
+    end
+  end
+
+  def safe_error_detail(message)
+    message.to_s.truncate(ERROR_DETAIL_LIMIT)
   end
 
   def error_result(code:, message:, details: nil)

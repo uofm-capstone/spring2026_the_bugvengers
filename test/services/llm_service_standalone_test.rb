@@ -115,6 +115,55 @@ class LlmServiceStandaloneTest < Minitest::Test
     end
   end
 
+  def test_returns_timeout_error_when_request_times_out
+    service = build_service
+
+    failing_post = lambda do |_url, _options|
+      raise Net::ReadTimeout, "execution expired"
+    end
+
+    HTTParty.stub(:post, failing_post) do
+      result = service.analyze(input: ["Client feedback"])
+
+      assert_equal false, result[:ok]
+      assert_equal "llm_timeout", result.dig(:error, :code)
+    end
+  end
+
+  def test_returns_invalid_llm_url_error_for_bad_config
+    service = build_service(api_url: "http://example.com:badport")
+
+    result = service.analyze(input: ["Client feedback"])
+
+    assert_equal false, result[:ok]
+    assert_equal "invalid_llm_url", result.dig(:error, :code)
+  end
+
+  def test_returns_http_error_with_status_details
+    service = build_service
+    fake_response = FakeHttpResponse.new(500, "server failed")
+
+    HTTParty.stub(:post, fake_response) do
+      result = service.analyze(input: ["Client feedback"])
+
+      assert_equal false, result[:ok]
+      assert_equal "llm_http_error", result.dig(:error, :code)
+      assert_equal 500, result.dig(:error, :details, :status)
+    end
+  end
+
+  def test_returns_invalid_response_error_for_empty_success_body
+    service = build_service
+    fake_response = FakeHttpResponse.new(200, "")
+
+    HTTParty.stub(:post, fake_response) do
+      result = service.analyze(input: ["Client feedback"])
+
+      assert_equal false, result[:ok]
+      assert_equal "invalid_llm_response", result.dig(:error, :code)
+    end
+  end
+
   def test_falls_back_to_raw_text_for_non_json_http_body
     service = build_service
     fake_response = FakeHttpResponse.new(200, "not-json-response")

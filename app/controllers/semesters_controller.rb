@@ -730,9 +730,13 @@ end
     matching_cards = cards.select { |card| card_matches_sprint?(card, sprint) }
     return matching_cards if matching_cards.any?
 
+    return [] unless sprint_in_progress?(sprint)
+
+    # Fallback only for the active sprint when cards are not explicitly tagged.
+    # This prevents Sprint 4 from inheriting Sprint 3 values.
     cards.select do |card|
       status = card.status.to_s
-      %w[Backlog Todo To\ Do In\ Progress Done Archived].include?(status) || done_in_any_sprint_status?(status)
+      %w[Backlog Todo To\ Do In\ Progress].include?(status)
     end
   end
 

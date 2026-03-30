@@ -533,8 +533,8 @@ end
       assigned_card_count += 1
       status = card.status || "Unspecified"
       per_student_column_counts[status] += 1
-      estimated_hours += numeric_field(card, "Time Estimate", "Estimate", "Estimated Hours")
-      time_spent_hours += numeric_field(card, "Time Spent", "Time Taken", "Hours Spent", "Spent")
+      estimated_hours += estimate_value(card)
+      time_spent_hours += spent_value(card)
     end
 
     done_status_total = per_student_column_counts["Done"] + per_student_column_counts["Archived"] +
@@ -580,10 +580,10 @@ end
     active_now_count = columns["Backlog"] + columns["Todo"] + columns["To Do"] + columns["In Progress"]
     total_count = columns.values.sum
 
-    estimated_hours = sprint_cards.sum { |card| numeric_field(card, "Time Estimate", "Estimate", "Estimated Hours") }
-    time_spent_hours = sprint_cards.sum { |card| numeric_field(card, "Time Spent", "Time Taken", "Hours Spent", "Spent") }
+    estimated_hours = sprint_cards.sum { |card| estimate_value(card) }
+    time_spent_hours = sprint_cards.sum { |card| spent_value(card) }
     cards_missing_time_spent = sprint_cards.count do |card|
-      done_in_any_sprint_status?(card.status) && numeric_field(card, "Time Spent", "Time Taken", "Hours Spent", "Spent").zero?
+      done_in_any_sprint_status?(card.status) && spent_value(card).zero?
     end
     in_current_sprint = sprint_in_progress?(sprint)
 
@@ -666,6 +666,29 @@ end
     fields[key].to_f
   end
 
+  def estimate_value(card)
+    numeric_field(
+      card,
+      "Time Estimate",
+      "Time Estiamte",
+      "Estimate",
+      "Estimated Hours",
+      "Estimated Time"
+    )
+  end
+
+  def spent_value(card)
+    numeric_field(
+      card,
+      "Time Spent",
+      "Time Taken",
+      "Hours Spent",
+      "Spent",
+      "Actual Time",
+      "Time Logged"
+    )
+  end
+
   def normalize_field_name(value)
     value.to_s.downcase.gsub(/[^a-z0-9]/, "")
   end
@@ -675,7 +698,8 @@ end
     return matching_cards if matching_cards.any?
 
     cards.select do |card|
-      %w[Backlog Todo To\ Do In\ Progress Done Archived].include?(card.status.to_s)
+      status = card.status.to_s
+      %w[Backlog Todo To\ Do In\ Progress Done Archived].include?(status) || done_in_any_sprint_status?(status)
     end
   end
 

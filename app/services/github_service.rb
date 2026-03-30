@@ -143,7 +143,7 @@ class GithubService
                 }
 
                 # Project-level fields (Status, custom fields, Assignees, etc.)
-                fieldValues(first: 20) {
+                fieldValues(first: 50) {
                   nodes {
                     __typename
 

@@ -736,7 +736,7 @@ end
     # This prevents Sprint 4 from inheriting Sprint 3 values.
     cards.select do |card|
       status = card.status.to_s
-      %w[Backlog Todo To\ Do In\ Progress].include?(status)
+      %w[Backlog Todo To\ Do In\ Progress Done].include?(status)
     end
   end
 

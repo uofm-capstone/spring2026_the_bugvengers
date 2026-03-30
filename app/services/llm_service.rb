@@ -97,6 +97,14 @@ class LlmService
   end
 
   # Converts supported input shapes into a clean array of text strings plus stats.
+  #
+  # Supported shapes include:
+  # - parser hash with :dataset and/or :respondents
+  # - direct dataset/respondents arrays
+  # - plain array of text strings
+  #
+  # This method intentionally does not parse CSV files. It only consumes already
+  # structured Ruby objects from the parser pipeline.
   def normalize_input(input)
     if input.is_a?(Hash)
       dataset = fetch_key(input, :dataset)
@@ -170,6 +178,7 @@ class LlmService
       respondent_team = "Unknown Team" if respondent_team.blank?
 
       Array.wrap(fetch_key(respondent, :responses)).each do |response|
+        question = fetch_key(response, :question).to_s.strip
         answer = fetch_key(response, :answer).to_s.strip
         type = fetch_key(response, :type).to_s.strip.downcase
 
@@ -189,7 +198,9 @@ class LlmService
           scale_count += 1
           next unless @include_scale_summary
 
-          summary_line = "Scale feedback: #{answer}"
+          # Keep scale summaries compact so they remain prompt-friendly while still
+          # preserving context when included by configuration.
+          summary_line = question.blank? ? "Scale feedback: #{answer}" : "Scale feedback (#{question}): #{answer}"
           text_responses << summary_line
           grouped[respondent_team] << summary_line
         end

@@ -125,4 +125,60 @@ class LlmServiceStandaloneTest < Minitest::Test
       assert_equal "invalid_llm_response", result.dig(:error, :code)
     end
   end
+
+  def test_normalizes_string_key_dataset_input
+    service = build_service
+    dataset_input = {
+      "dataset" => [
+        {
+          "team" => "Team String Keys",
+          "responses" => ["  Solid progress  ", ""]
+        }
+      ]
+    }
+
+    body = { response: "ok" }.to_json
+    fake_response = FakeHttpResponse.new(200, body)
+
+    HTTParty.stub(:post, fake_response) do
+      result = service.analyze(input: dataset_input)
+
+      assert_equal true, result[:ok]
+      assert_equal "ok", result[:data]
+    end
+  end
+
+  def test_uses_respondents_when_dataset_empty
+    service = build_service
+    input = {
+      dataset: [],
+      respondents: [
+        {
+          responses: [
+            { question: "Q7", answer: "Clear communication overall", type: :text }
+          ],
+          metadata: { team: "Fallback Team" }
+        }
+      ]
+    }
+
+    body = { response: "respondent path used" }.to_json
+    fake_response = FakeHttpResponse.new(200, body)
+
+    HTTParty.stub(:post, fake_response) do
+      result = service.analyze(input: input)
+
+      assert_equal true, result[:ok]
+      assert_equal "respondent path used", result[:data]
+    end
+  end
+
+  def test_returns_no_feedback_when_only_blank_text_inputs
+    service = build_service
+
+    result = service.analyze(input: ["", "   "])
+
+    assert_equal false, result[:ok]
+    assert_equal "no_feedback", result.dig(:error, :code)
+  end
 end

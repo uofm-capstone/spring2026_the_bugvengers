@@ -6,7 +6,6 @@
     <div class="github-inspector-team mt-3">
       <h6><%= team.name %></h6>
       <p class="mb-1"><strong>Project URL:</strong> <%= inspector[:project_url] || "N/A" %></p>
-      <p class="mb-1"><strong>Repo:</strong> <%= inspector[:repo_full_name] || "N/A" %></p>
       <p class="mb-1"><strong>Status Options:</strong> <%= Array(inspector[:status_options]).join(", ") %></p>
       <p class="mb-2"><strong>Card Counts:</strong> <%= format_card_counts(inspector[:card_counts]) %></p>
 
@@ -14,8 +13,10 @@
         <div class="github-inspector-sprint">
           <strong><%= sprint_name %></strong>
           <span>Window: <%= payload[:start_date] %> - <%= payload[:end_date] %></span>
-          <span>Total Commits: <%= payload[:total_commits] %></span>
-          <span>0-Commit Students: <%= format_students_without_commits(payload[:students_without_commits]) %></span>
+          <span>Total Cards: <%= payload[:total_cards] %></span>
+          <span>Estimate: <%= payload[:total_estimate] %>h</span>
+          <span>Spent: <%= payload[:total_spent] %>h</span>
+          <span>Done Missing TS: <%= payload[:cards_missing_spent] %></span>
         </div>
       <% end %>
     </div>

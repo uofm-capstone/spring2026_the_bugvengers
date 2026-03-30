@@ -21,7 +21,7 @@
           <div class="team-overview-sprint-pill <%= sprint_pill_state_class(sprint_metric) %>">
             <strong><%= sprint %></strong>
             <span>Done: <%= sprint_metric[:sprint_done_cards] || 0 %></span>
-            <span>Commits: <%= sprint_metric[:team_commit_count] || 0 %></span>
+            <span>Spent: <%= sprint_metric[:time_spent_hours] || 0 %>h</span>
           </div>
         <% end %>
       </div>

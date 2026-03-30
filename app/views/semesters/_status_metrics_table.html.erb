@@ -3,38 +3,24 @@
   <table class="table table-bordered align-middle text-center team-status-table">
     <thead>
       <tr>
-        <th class="sticky-col-1" rowspan="3">Team Name</th>
-        <th class="sticky-col-2" rowspan="3">Member</th>
+        <th class="sticky-col-1" rowspan="2">Team Name</th>
+        <th class="sticky-col-2" rowspan="2">Member</th>
         <% sprint_list.each do |sprint| %>
-          <th colspan="15" class="sprint-group <%= sprint.parameterize %>"><%= sprint %></th>
+          <th colspan="6" class="sprint-group <%= sprint.parameterize %>"><%= sprint %></th>
         <% end %>
       </tr>
 
       <tr>
-        <% sprint_list.each do |sprint| %>
-          <th colspan="4" class="sprint-group <%= sprint.parameterize %>">Planning</th>
-          <th colspan="4" class="sprint-group <%= sprint.parameterize %>">PC</th>
-          <th colspan="7" class="sprint-group <%= sprint.parameterize %>">Demo</th>
-        <% end %>
-      </tr>
-
-      <tr>
-        <% rubric_items = ["FS&D", "FA", "TE", "KU", "TS", "PP", "CC", "SR", "TSP", "PP", "PF", "CBP", "CC", "SR", "D"] %>
+        <% rubric_items = ["FS&D", "FA", "TE", "TS", "KU", "PP"] %>
         <% sprint_list.each do |sprint| %>
           <% rubric_items.each do |item| %>
             <% tooltip = case item
-              when "FS&D" then "<strong>Feature Selection and Decomposition</strong><br><b>Metric:</b> Number of cards per column."
-              when "FA"   then "<strong>Feature Assignments</strong><br><b>Metric:</b> Number of cards assigned to each team member."
-              when "TE"   then "<strong>Feature Time Estimates</strong><br><b>Metric:</b> Sum of estimated hours per team member."
-              when "KU"   then "<strong>Kanban Updates</strong><br><b>Metric:</b> N/A."
-              when "TS"   then "<strong>Time Spent</strong><br><b>Metric:</b> N/A."
-              when "PP"   then "<strong>Product Progress</strong><br><b>Metric:</b> Distinguishes current board Done from Done in this sprint column."
-              when "CC"   then "<strong>Client Communication</strong><br><b>Metric:</b> N/A."
-              when "CBP"  then "<strong>Coding Best Practices</strong><br><b>Metric:</b> Count of commits and line changes."
-              when "SR"   then "<strong>Status and Reflection</strong><br><b>Metric:</b> N/A."
-              when "TSP"  then "<strong>Time Spent Since Progress Check</strong><br><b>Metric:</b> Work hours or updates since last check."
-              when "PF"   then "<strong>Product Feedback</strong><br><b>Metric:</b> N/A."
-              when "D"    then "<strong>Demo</strong><br><b>Metric:</b> N/A."
+              when "FS&D" then "<strong>Feature Selection and Decomposition</strong><br><b>Metric:</b> Student cards per status in this sprint (Backlog, Todo, In Progress, Done)."
+              when "FA"   then "<strong>Feature Assignments</strong><br><b>Metric:</b> Number of cards assigned to this student in this sprint."
+              when "TE"   then "<strong>Time Estimate</strong><br><b>Metric:</b> Estimated hours for this student's sprint cards."
+              when "TS"   then "<strong>Time Spent</strong><br><b>Metric:</b> Logged hours from Kanban Time Spent field for this student's sprint cards."
+              when "KU"   then "<strong>Kanban Updates</strong><br><b>Metric:</b> Board health indicators for sprint cards."
+              when "PP"   then "<strong>Product Progress</strong><br><b>Metric:</b> Done on board vs Done in this sprint."
               else "<strong>Metric</strong><br><b>Metric:</b> Description unavailable."
             end %>
 
@@ -91,11 +77,13 @@
                       <%= metric.dig(:fa, :assigned_cards) || 0 %>
                     <% when "TE" %>
                       <%= metric.dig(:te, :estimated_hours) || 0 %>
+                    <% when "TS" %>
+                      <%= metric.dig(:ts, :time_spent_hours) || 0 %>
                     <% when "KU" %>
                       <% team_metric = team_sprint_metrics.dig(team.id, sprint) || {} %>
                       <div class="status-metric-stack">
                         <span><strong>Archived:</strong> <%= team_metric[:archived_column_exists] ? 'Yes' : 'No' %></span>
-                        <span><strong>Active:</strong> <%= team_metric[:active_now_cards] || 0 %></span>
+                        <span><strong>Missing TS:</strong> <%= team_metric[:cards_missing_time_spent] || 0 %></span>
                       </div>
                     <% when "PP" %>
                       <% team_metric = team_sprint_metrics.dig(team.id, sprint) || {} %>
@@ -105,30 +93,8 @@
                         <span><strong>Total:</strong> <%= team_metric[:total_cards] || 0 %></span>
                       </div>
 
-                    <% when "CBP" %>
-                      <% metric = status_metrics.dig(team.id, student.id, sprint, :cbp) %>
-                      <div class="status-metric-stack">
-                        <span><strong>Commits:</strong> <%= metric&.commit_count || 0 %></span>
-                        <span><strong>LOC:</strong> <%= metric&.lines_changed || 0 %></span>
-                      </div>
-
-                    <% when "TSP" %>
-                      <% tsp = metric[:tsp] || {} %>
-                      <div class="status-metric-stack">
-                        <span><strong>Commits:</strong> <%= tsp[:commit_count_since_progress] || 0 %></span>
-                        <span><strong>LOC:</strong> <%= tsp[:lines_changed_since_progress] || 0 %></span>
-                        <span><strong>Stale:</strong> <%= tsp[:stale_assigned_tasks] || 0 %></span>
-                      </div>
-
-                    <% when "TS", "CC", "SR", "PF", "D" %>
-                      <span class="ui-tooltip" tabindex="0" aria-label="No data / N/A" data-tooltip="No data / N/A">
-                        <%= image_tag "question-circle-fill.svg", class: "team-status-icon", alt: "", aria: { hidden: true } %>
-                      </span>
-
                     <% else %>
-                      <span class="ui-tooltip" tabindex="0" aria-label="No data / N/A" data-tooltip="No data / N/A">
-                        <%= image_tag "question-circle-fill.svg", class: "team-status-icon", alt: "", aria: { hidden: true } %>
-                      </span>
+                      <span>-</span>
                   <% end %>
                 </td>
               <% end %>
@@ -154,13 +120,11 @@
                   <% when "FA" %>
                     <strong><%= team.students.sum { |s| status_metrics.dig(team.id, s.id, sprint, :fa, :assigned_cards).to_i } %></strong>
                   <% when "TE" %>
-                    <strong><%= team.students.sum { |s| status_metrics.dig(team.id, s.id, sprint, :te, :estimated_hours).to_f }.round(1) %></strong>
-                  <% when "CBP" %>
-                    <strong>Commits: <%= team.students.sum { |s| status_metrics.dig(team.id, s.id, sprint, :cbp)&.commit_count.to_i } %> | LOC: <%= team.students.sum { |s| status_metrics.dig(team.id, s.id, sprint, :cbp)&.lines_changed.to_i } %></strong>
-                  <% when "TSP" %>
-                    <strong>Commits: <%= team.students.sum { |s| status_metrics.dig(team.id, s.id, sprint, :tsp, :commit_count_since_progress).to_i } %> | LOC: <%= team.students.sum { |s| status_metrics.dig(team.id, s.id, sprint, :tsp, :lines_changed_since_progress).to_i } %></strong>
+                    <strong><%= team_metric[:estimated_hours] || 0 %></strong>
+                  <% when "TS" %>
+                    <strong><%= team_metric[:time_spent_hours] || 0 %></strong>
                   <% when "KU" %>
-                    <strong>Archived: <%= team_metric[:archived_column_exists] ? 'Yes' : 'No' %> | Active: <%= team_metric[:active_now_cards] || 0 %></strong>
+                    <strong>Archived: <%= team_metric[:archived_column_exists] ? 'Yes' : 'No' %> | Missing TS: <%= team_metric[:cards_missing_time_spent] || 0 %></strong>
                   <% when "PP" %>
                     <strong>Done: <%= team_metric[:current_board_done_cards] || 0 %> | <%= sprint %>: <%= team_metric[:sprint_done_cards] || 0 %></strong>
                   <% else %>

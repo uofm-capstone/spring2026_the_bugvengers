@@ -80,18 +80,9 @@
                     <% when "TT" %>
                       <%= metric.dig(:ts, :time_spent_hours) || 0 %>
                     <% when "KU" %>
-                      <% team_metric = team_sprint_metrics.dig(team.id, sprint) || {} %>
-                      <div class="status-metric-stack">
-                        <span><strong>Archived:</strong> <%= team_metric[:archived_column_exists] ? 'Yes' : 'No' %></span>
-                        <span><strong>Missing TT:</strong> <%= team_metric[:cards_missing_time_spent] || 0 %></span>
-                      </div>
+                      <span class="text-muted">-</span>
                     <% when "PP" %>
-                      <% team_metric = team_sprint_metrics.dig(team.id, sprint) || {} %>
-                      <div class="status-metric-stack">
-                        <span><strong>Board Done:</strong> <%= team_metric[:current_board_done_cards] || 0 %></span>
-                        <span><strong><%= sprint %>:</strong> <%= team_metric[:sprint_done_cards] || 0 %></span>
-                        <span><strong>Total:</strong> <%= team_metric[:total_cards] || 0 %></span>
-                      </div>
+                      <span class="text-muted">-</span>
 
                     <% else %>
                       <span>-</span>

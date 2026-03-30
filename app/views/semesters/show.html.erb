@@ -74,8 +74,9 @@
               </div>
 
               <%= render "semesters/status_filters", sprint_list: @sprint_list %>
-              <%= render "semesters/team_overview_cards", team_status_overview: @team_status_overview, sprint_list: @sprint_list %>
-              <%= render "semesters/github_data_inspector", teams: @teams, github_inspector: @github_inspector %>
+              <% if @show_github_inspector %>
+                <%= render "semesters/github_data_inspector", teams: @teams, github_inspector: @github_inspector %>
+              <% end %>
 
               <%= render "semesters/status_metrics_table",
                 sprint_list: @sprint_list,

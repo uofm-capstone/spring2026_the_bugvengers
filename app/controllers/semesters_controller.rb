@@ -417,6 +417,7 @@ def status
     end
 
     @team_overview_by_id = @team_status_overview.index_by { |summary| summary[:team_id] }
+    @show_github_inspector = current_user.admin? && params[:debug] == "github"
 
     render :show
 end

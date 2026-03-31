@@ -280,7 +280,7 @@ end
       flash.now[:error] = "Semester update failed!"
       render :edit, status: :unprocessable_entity
     end
-end
+  end
 # def update
 #   @semester = Semester.find(params[:id])
 #   was_student_csv_attached = @semester.student_csv.attached?
@@ -326,12 +326,122 @@ end
   # --------------------------------------------------------
 
   # Displays semester progress status for all teams/sprints.
-def status
-  @semester = Semester.find_by(id: params[:id])
+  def status
+    @semester = Semester.find_by(id: params[:id])
     return redirect_to(semesters_path) unless @semester
 
     session[:last_viewed_semester_id] = @semester.id
 
+    render :show
+  end
+
+  # Returns heavy status content after shell has rendered.
+  def status_content
+    @semester = Semester.find_by(id: params[:id])
+    return head :not_found unless @semester
+
+    session[:last_viewed_semester_id] = @semester.id
+
+    build_status_payload!
+    @show_github_inspector = current_user.admin? && params[:debug] == "github"
+
+    render partial: "semesters/status_content"
+  end
+
+  # --------------------------------------------------------
+  # UPLOAD ADDITIONAL CSV FILES
+  # --------------------------------------------------------
+
+  # Handles Sprint CSV uploads (student/client data per sprint).
+  def upload_sprint_csv
+    @semester = Semester.find(params[:id])
+    sprint_name = params[:sprint_name]
+
+    @semester.student_csv.attach(params[:student_csv]) if params[:student_csv].present?
+    @semester.client_csv.attach(params[:client_csv]) if params[:client_csv].present?
+
+    flash[:notice] = "#{sprint_name} CSVs uploaded!"
+    redirect_to semester_path(@semester)
+  end
+
+  # --------------------------------------------------------
+  # HELPER / UTILITY METHODS
+  # --------------------------------------------------------
+
+  # Returns a list of all team names for a given semester.
+  def getTeams(semester)
+    semester.teams.pluck(:name)
+  end
+
+  # Builds flag indicators for teams on the status page.
+  def get_flags(semester, sprint, team)
+    flags = []
+    begin
+      semester.student_csv.open do |tempStudent|
+        studentData = SmarterCSV.process(tempStudent.path)
+        student_survey = studentData.find_all { |survey| survey[:q2] == team && survey[:q22] == sprint }
+        flags.append("student blank") if student_survey.blank?
+      end
+    rescue => _e
+      flags.append("no data")
+    end
+    flags
+  end
+
+  # Checks if any teams exist (used in views).
+  def team_exist(arr)
+    arr.length > 0
+  end
+
+  # Loads static student classlist CSV for older semesters (legacy feature).
+  def classlist
+    @semester = Semester.find(params[:id])
+    filepath = Rails.root.join('lib', 'assets', 'Students_list.csv')
+    @students_info = []
+
+    CSV.foreach(filepath, headers: true) do |row|
+      @students_info << { full_name: row['Name'], role: row['Role'] }
+    end
+  rescue ActiveRecord::RecordNotFound
+    redirect_to semesters_path, alert: 'Semester not found.'
+  end
+
+  # Determines if all teams for a sprint are marked "student blank".
+  def unfinished_sprint(teams, flags, sprint)
+    teams.each do |t|
+      return false if flags[sprint][t] != ["student blank"]
+    end
+    true
+  end
+
+  def save_sprints
+    @semester = Semester.find(params[:id])
+
+    (1..4).each do |i|
+      sprint_params = params["sprint_#{i}"]
+      next unless sprint_params.present?
+
+      sprint = @semester.sprints.find_or_initialize_by(name: "Sprint #{i}")
+
+      sprint.assign_attributes(
+        planning_deadline: parse_date(sprint_params[:planning_deadline]),
+        progress_deadline: parse_date(sprint_params[:progress_deadline]),
+        demo_deadline: parse_date(sprint_params[:demo_deadline])
+      )
+
+      sprint.save!
+    end
+
+    redirect_to semester_path(@semester), notice: "Sprint deadlines saved successfully."
+  end
+
+  # --------------------------------------------------------
+  # PRIVATE METHODS
+  # --------------------------------------------------------
+
+  private
+
+  def build_status_payload!
     @teams = @semester.teams
     @sprint_list = @semester.sprints.pluck(:name)
     @flags = {}
@@ -438,103 +548,7 @@ def status
     end
 
     @team_overview_by_id = @team_status_overview.index_by { |summary| summary[:team_id] }
-    @show_github_inspector = current_user.admin? && params[:debug] == "github"
-
-    render :show
-end
-
-  # --------------------------------------------------------
-  # UPLOAD ADDITIONAL CSV FILES
-  # --------------------------------------------------------
-
-  # Handles Sprint CSV uploads (student/client data per sprint).
-  def upload_sprint_csv
-    @semester = Semester.find(params[:id])
-    sprint_name = params[:sprint_name]
-
-    @semester.student_csv.attach(params[:student_csv]) if params[:student_csv].present?
-    @semester.client_csv.attach(params[:client_csv]) if params[:client_csv].present?
-
-    flash[:notice] = "#{sprint_name} CSVs uploaded!"
-    redirect_to semester_path(@semester)
   end
-
-  # --------------------------------------------------------
-  # HELPER / UTILITY METHODS
-  # --------------------------------------------------------
-
-  # Returns a list of all team names for a given semester.
-  def getTeams(semester)
-    semester.teams.pluck(:name)
-  end
-
-  # Builds flag indicators for teams on the status page.
-  def get_flags(semester, sprint, team)
-    flags = []
-    begin
-      semester.student_csv.open do |tempStudent|
-        studentData = SmarterCSV.process(tempStudent.path)
-        student_survey = studentData.find_all { |survey| survey[:q2] == team && survey[:q22] == sprint }
-        flags.append("student blank") if student_survey.blank?
-      end
-    rescue => _e
-      flags.append("no data")
-    end
-    flags
-  end
-
-  # Checks if any teams exist (used in views).
-  def team_exist(arr)
-    arr.length > 0
-  end
-
-  # Loads static student classlist CSV for older semesters (legacy feature).
-  def classlist
-    @semester = Semester.find(params[:id])
-    filepath = Rails.root.join('lib', 'assets', 'Students_list.csv')
-    @students_info = []
-
-    CSV.foreach(filepath, headers: true) do |row|
-      @students_info << { full_name: row['Name'], role: row['Role'] }
-    end
-  rescue ActiveRecord::RecordNotFound
-    redirect_to semesters_path, alert: 'Semester not found.'
-  end
-
-  # Determines if all teams for a sprint are marked "student blank".
-  def unfinished_sprint(teams, flags, sprint)
-    teams.each do |t|
-      return false if flags[sprint][t] != ["student blank"]
-    end
-    true
-  end
-
-  def save_sprints
-    @semester = Semester.find(params[:id])
-
-    (1..4).each do |i|
-      sprint_params = params["sprint_#{i}"]
-      next unless sprint_params.present?
-
-      sprint = @semester.sprints.find_or_initialize_by(name: "Sprint #{i}")
-
-      sprint.assign_attributes(
-        planning_deadline: parse_date(sprint_params[:planning_deadline]),
-        progress_deadline: parse_date(sprint_params[:progress_deadline]),
-        demo_deadline: parse_date(sprint_params[:demo_deadline])
-      )
-
-      sprint.save!
-    end
-
-    redirect_to semester_path(@semester), notice: "Sprint deadlines saved successfully."
-  end
-
-  # --------------------------------------------------------
-  # PRIVATE METHODS
-  # --------------------------------------------------------
-
-  private
 
   def build_live_status_metrics(sprint_cards:, board_health:, student:, sprint:, github_student_metrics: nil)
     columns = @service.get_card_count_per_column(sprint_cards)

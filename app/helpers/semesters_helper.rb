@@ -59,6 +59,21 @@ module SemestersHelper
     format("%.1f", value.to_f)
   end
 
+  def github_chip_tooltip(chip)
+    case chip.to_s.upcase
+    when "GH"
+      "GitHub Composite: weighted score from KAN (35%), CBP (30%), PR (20%), and RVW (15%)."
+    when "CBP"
+      "Coding Best Practices: based on commit activity and code churn (lines changed) during the sprint window."
+    when "PR"
+      "Pull Request workflow: rewards opened/merged PRs and faster merge velocity; penalizes lingering open PRs."
+    when "RVW"
+      "Review activity: based on reviews submitted, approvals, and changes-requested signals during the sprint."
+    else
+      "GitHub grading component."
+    end
+  end
+
   def format_missing_github_flags(flags)
     Array(flags).map { |flag| flag.to_s.tr("_", " ") }.map(&:capitalize).join(", ")
   end

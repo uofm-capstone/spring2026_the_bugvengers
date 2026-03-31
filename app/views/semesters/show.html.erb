@@ -108,11 +108,45 @@
       });
     } 
 
+    // Fallback loader: if Turbo frame src does not hydrate, fetch and inject content manually.
+    async function ensureStatusContentLoaded() {
+      const frame = document.getElementById("semester-status-content");
+      if (!frame) return;
+
+      // Skip if content appears loaded already.
+      if (frame.querySelector(".team-status-table") || frame.dataset.loaded === "1") return;
+
+      const src = frame.getAttribute("src");
+      if (!src) return;
+
+      try {
+        const response = await fetch(src, {
+          headers: {
+            Accept: "text/html"
+          },
+          credentials: "same-origin"
+        });
+        if (!response.ok) return;
+
+        const html = await response.text();
+        const parsed = new DOMParser().parseFromString(html, "text/html");
+        const returnedFrame = parsed.getElementById("semester-status-content");
+
+        frame.innerHTML = returnedFrame ? returnedFrame.innerHTML : html;
+        frame.dataset.loaded = "1";
+        initTooltipsAndSprintFilter();
+      } catch (_e) {
+      }
+    }
+
     document.addEventListener("DOMContentLoaded", initTooltipsAndSprintFilter);
     document.addEventListener("turbo:load", initTooltipsAndSprintFilter);
     document.addEventListener("turbo:frame-load", (event) => {
       if (event.target && event.target.id === "semester-status-content") {
+        event.target.dataset.loaded = "1";
         initTooltipsAndSprintFilter();
       }
     });
+    document.addEventListener("DOMContentLoaded", () => setTimeout(ensureStatusContentLoaded, 300));
+    document.addEventListener("turbo:load", () => setTimeout(ensureStatusContentLoaded, 300));
   </script>

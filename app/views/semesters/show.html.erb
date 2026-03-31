@@ -24,8 +24,19 @@
           <div class="row">
             <div class="mt-4 text-center">
               <h2>Team Status</h2>
-              <div class="alert alert-info" role="status">
-                Loading status metrics from GitHub. This page is ready while data loads.
+              <div class="alert alert-info" role="status" id="status-load-panel">
+                <div class="mb-2">Loading status metrics from GitHub. This page is ready while data loads.</div>
+                <div class="progress" style="height: 0.9rem;">
+                  <div
+                    id="status-load-bar"
+                    class="progress-bar progress-bar-striped progress-bar-animated"
+                    role="progressbar"
+                    style="width: 8%;"
+                    aria-valuemin="0"
+                    aria-valuemax="100"
+                    aria-valuenow="8">8%</div>
+                </div>
+                <small id="status-load-text" class="d-block mt-2 text-muted">Fetching Kanban + GitHub data...</small>
               </div>
             </div>
           </div>
@@ -108,18 +119,58 @@
       });
     } 
 
-    // Fallback loader: if Turbo frame src does not hydrate, fetch and inject content manually.
+    let statusProgressTimer;
+
+    function setStatusProgress(value, label) {
+      const bar = document.getElementById("status-load-bar");
+      const text = document.getElementById("status-load-text");
+      if (bar) {
+        const bounded = Math.max(0, Math.min(100, value));
+        bar.style.width = `${bounded}%`;
+        bar.setAttribute("aria-valuenow", bounded.toString());
+        bar.textContent = `${bounded}%`;
+      }
+      if (text && label) text.textContent = label;
+    }
+
+    function startStatusProgress() {
+      clearInterval(statusProgressTimer);
+      let value = 8;
+      setStatusProgress(value, "Fetching Kanban + GitHub data...");
+
+      // Simulate meaningful progress while waiting for network-bound API work.
+      statusProgressTimer = setInterval(() => {
+        value = Math.min(92, value + Math.max(1, Math.round((95 - value) * 0.12)));
+        setStatusProgress(value);
+      }, 450);
+    }
+
+    function completeStatusProgress(message) {
+      clearInterval(statusProgressTimer);
+      setStatusProgress(100, message || "Status metrics loaded.");
+      const panel = document.getElementById("status-load-panel");
+      if (panel) {
+        setTimeout(() => {
+          panel.style.display = "none";
+        }, 200);
+      }
+    }
+
+    // Fallback loader: only runs if Turbo frame hydration appears stuck.
     async function ensureStatusContentLoaded() {
       const frame = document.getElementById("semester-status-content");
       if (!frame) return;
 
       // Skip if content appears loaded already.
       if (frame.querySelector(".team-status-table") || frame.dataset.loaded === "1") return;
+      if (frame.hasAttribute("busy")) return;
+      if (frame.dataset.fallbackFetchStarted === "1") return;
 
       const src = frame.getAttribute("src");
       if (!src) return;
 
       try {
+        frame.dataset.fallbackFetchStarted = "1";
         const response = await fetch(src, {
           headers: {
             Accept: "text/html"
@@ -134,19 +185,33 @@
 
         frame.innerHTML = returnedFrame ? returnedFrame.innerHTML : html;
         frame.dataset.loaded = "1";
+        completeStatusProgress("Status metrics loaded.");
         initTooltipsAndSprintFilter();
       } catch (_e) {
+      } finally {
+        frame.dataset.fallbackFetchStarted = "0";
       }
+    }
+
+    function scheduleStatusFallback() {
+      setTimeout(() => {
+        const frame = document.getElementById("semester-status-content");
+        if (!frame || frame.dataset.loaded === "1") return;
+        ensureStatusContentLoaded();
+      }, 3500);
     }
 
     document.addEventListener("DOMContentLoaded", initTooltipsAndSprintFilter);
     document.addEventListener("turbo:load", initTooltipsAndSprintFilter);
+    document.addEventListener("DOMContentLoaded", startStatusProgress);
+    document.addEventListener("turbo:load", startStatusProgress);
     document.addEventListener("turbo:frame-load", (event) => {
       if (event.target && event.target.id === "semester-status-content") {
         event.target.dataset.loaded = "1";
+        completeStatusProgress("Status metrics loaded.");
         initTooltipsAndSprintFilter();
       }
     });
-    document.addEventListener("DOMContentLoaded", () => setTimeout(ensureStatusContentLoaded, 300));
-    document.addEventListener("turbo:load", () => setTimeout(ensureStatusContentLoaded, 300));
+    document.addEventListener("DOMContentLoaded", scheduleStatusFallback);
+    document.addEventListener("turbo:load", scheduleStatusFallback);
   </script>

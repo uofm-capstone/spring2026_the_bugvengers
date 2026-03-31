@@ -19,6 +19,7 @@ class LlmService
   GENERATE_PATH = "/api/generate"
   CHAT_PATH = "/api/chat"
 
+  # Builds a configurable service instance from env defaults and optional overrides.
   def initialize(
     api_url: ENV["LLM_API_URL"],
     model: ENV["LLM_MODEL"].presence || DEFAULT_MODEL,
@@ -137,11 +138,13 @@ class LlmService
     normalize_string_array(Array.wrap(input))
   end
 
+  # Detects whether an array appears to use the grouped dataset shape.
   def dataset_array?(input)
     # Parser dataset shape: [{ team: "...", responses: ["..."] }]
     input.first.is_a?(Hash) && (fetch_key(input.first, :responses).present? || fetch_key(input.first, :team).present?)
   end
 
+  # Detects whether an array appears to contain respondent response hashes.
   def respondents_array?(input)
     return false unless input.first.is_a?(Hash)
 
@@ -149,6 +152,7 @@ class LlmService
     first_responses.is_a?(Array) && first_responses.first.is_a?(Hash) && fetch_key(first_responses.first, :answer).present?
   end
 
+  # Normalizes team-grouped dataset input into flat responses + grouped view.
   def normalize_dataset(dataset)
     responses = []
     grouped = Hash.new { |h, k| h[k] = [] }
@@ -181,6 +185,7 @@ class LlmService
     }
   end
 
+  # Normalizes respondent-level responses, optionally converting scale rows to text.
   def normalize_respondents(respondents)
     text_responses = []
     grouped = Hash.new { |h, k| h[k] = [] }
@@ -233,6 +238,7 @@ class LlmService
     }
   end
 
+  # Normalizes plain string input into the same internal structure used everywhere else.
   def normalize_string_array(strings)
     cleaned = Array.wrap(strings).map { |value| value.to_s.strip }.reject(&:blank?)
 
@@ -247,10 +253,13 @@ class LlmService
     }
   end
 
-  # Direct prompt strings are sent as-is so prompt writers have full control.
-  # If prompt is omitted, the default prompt template is used.
+  # Custom prompts are treated as instruction prefixes. We always append
+  # normalized feedback context so the model can answer from real data.
+  # If prompt is omitted, the default instruction template is used.
   def resolve_prompt(prompt:, normalized:)
-    return prompt if prompt.is_a?(String) && prompt.present?
+    if prompt.is_a?(String) && prompt.present?
+      return [prompt.strip, "", feedback_entries_section(normalized)].join("\n")
+    end
 
     build_default_prompt(normalized)
   end
@@ -262,7 +271,14 @@ class LlmService
     lines << "Return: (1) sentiment summary, (2) potential conflicts/risks, (3) concise action items."
     lines << "If there is uncertainty, say so briefly."
     lines << ""
-    lines << "Feedback entries:"
+    lines << feedback_entries_section(normalized)
+
+    lines.join("\n")
+  end
+
+  # Renders a consistent bullet-list context block appended to every prompt.
+  def feedback_entries_section(normalized)
+    lines = ["Feedback entries:"]
 
     normalized[:grouped_by_team].each do |team, team_responses|
       next if team_responses.empty?
@@ -274,6 +290,7 @@ class LlmService
     lines.join("\n")
   end
 
+  # Resolves the final Ollama endpoint URL from env base URL + selected endpoint mode.
   def endpoint_url(endpoint)
     base = @api_url.to_s.sub(%r{/$}, "")
 
@@ -359,6 +376,7 @@ class LlmService
     )
   end
 
+  # Extracts model text from Ollama's generate/chat response shapes.
   def extract_llm_output(parsed_body, endpoint)
     return nil unless parsed_body.is_a?(Hash)
 
@@ -390,6 +408,7 @@ class LlmService
     hash[key] || hash[key.to_s]
   end
 
+  # Returns the standardized success envelope used by all happy paths.
   def success_result(data:, meta: {})
     {
       ok: true,
@@ -399,6 +418,7 @@ class LlmService
     }
   end
 
+  # Returns a standardized configuration error envelope.
   def config_error(message)
     error_result(code: "configuration_error", message: message)
   end
@@ -430,10 +450,12 @@ class LlmService
     end
   end
 
+  # Truncates error details to prevent oversized payloads/log noise.
   def safe_error_detail(message)
     message.to_s.truncate(ERROR_DETAIL_LIMIT)
   end
 
+  # Returns the standardized error envelope used by all failure paths.
   def error_result(code:, message:, details: nil)
     {
       ok: false,

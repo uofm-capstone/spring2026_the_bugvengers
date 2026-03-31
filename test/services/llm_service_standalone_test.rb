@@ -252,9 +252,9 @@ class LlmServiceStandaloneTest < Minitest::Test
     assert_equal "no_feedback", result.dig(:error, :code)
   end
 
-  def test_uses_direct_prompt_without_modifying_text
+  def test_appends_feedback_context_to_custom_prompt
     service = build_service
-    provided_prompt = "  Keep this spacing and wording exactly.  "
+    provided_prompt = "Keep this spacing and wording exactly."
     captured_prompt = nil
 
     post_stub = lambda do |_url, options|
@@ -267,7 +267,9 @@ class LlmServiceStandaloneTest < Minitest::Test
       result = service.analyze(input: ["Client feedback"], prompt: provided_prompt)
 
       assert_equal true, result[:ok]
-      assert_equal provided_prompt, captured_prompt
+      assert_includes captured_prompt, provided_prompt
+      assert_includes captured_prompt, "Feedback entries:"
+      assert_includes captured_prompt, "- Client feedback"
     end
   end
 

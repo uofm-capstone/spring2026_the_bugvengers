@@ -1,4 +1,5 @@
 # app/services/github_service.rb
+require "digest"
 require "octokit"
 
 class GithubService
@@ -22,6 +23,10 @@ class GithubService
   def initialize(token: nil, team: nil, user: nil, logger: Rails.logger)
     @logger = logger
     resolved_token = self.class.resolve_token(token: token, team: team, user: user)
+    @cache_namespace = resolved_token.present? ? Digest::SHA256.hexdigest(resolved_token.to_s)[0, 12] : "no-token"
+    @pull_requests_cache = {}
+    @pull_request_reviews_cache = {}
+    @commit_details_cache = {}
 
     if resolved_token.blank?
       @logger.warn("GithubService initialized without token")
@@ -89,10 +94,16 @@ class GithubService
   def board_health(project_url, stale_after_days: 14)
     return BoardHealth.new([], [], false, []) unless @client
 
-    org, number = parse_project_url(project_url)
-    return BoardHealth.new([], [], false, []) if org.blank? || number.blank?
+    cache_fetch(
+      "board_health",
+      project_url,
+      stale_after_days,
+      expires_in: 3.minutes
+    ) do
+      org, number = parse_project_url(project_url)
+      next BoardHealth.new([], [], false, []) if org.blank? || number.blank?
 
-    query = <<~GRAPHQL
+      query = <<~GRAPHQL
       query($org: String!, $number: Int!) {
         organization(login: $org) {
           projectV2(number: $number) {
@@ -182,42 +193,43 @@ class GithubService
       }
     GRAPHQL
 
-    variables = { org: org, number: number }
+      variables = { org: org, number: number }
 
-    begin
-      result = @client.post("graphql", { query: query, variables: variables }.to_json)
-      project = result.dig(:data, :organization, :projectV2)
+      begin
+        result = @client.post("graphql", { query: query, variables: variables }.to_json)
+        project = result.dig(:data, :organization, :projectV2)
 
-      if project.blank?
-        user_query = query.gsub("organization(login: $org)", "user(login: $org)")
-        user_result = @client.post("graphql", { query: user_query, variables: variables }.to_json)
-        project = user_result.dig(:data, :user, :projectV2)
+        if project.blank?
+          user_query = query.gsub("organization(login: $org)", "user(login: $org)")
+          user_result = @client.post("graphql", { query: user_query, variables: variables }.to_json)
+          project = user_result.dig(:data, :user, :projectV2)
+        end
+
+        unless project
+          @logger.warn("No project found or access denied for #{project_url}")
+          next BoardHealth.new([], [], false, [])
+        end
+
+        items = project.dig(:items, :nodes) || []
+        cards = items.map { |item| build_card(item) }
+
+        status_options = project.dig(:fields, :nodes).to_a.filter_map do |field|
+          next unless field[:__typename] == "ProjectV2SingleSelectField"
+          next unless field[:name].to_s.casecmp("Status").zero?
+
+          (field[:options] || []).map { |option| option[:name] }
+        end.flatten.compact
+
+        archived_column_exists = status_options.any? { |name| name.to_s.casecmp("archived").zero? }
+
+        stale_cutoff = Time.current - stale_after_days.days
+        stale_cards = stale_cards(cards, stale_cutoff: stale_cutoff)
+
+        BoardHealth.new(cards, status_options, archived_column_exists, stale_cards)
+      rescue StandardError => e
+        @logger.error("GitHub project board query failed: #{e.class} - #{e.message}")
+        BoardHealth.new([], [], false, [])
       end
-
-      unless project
-        @logger.warn("No project found or access denied for #{project_url}")
-        return BoardHealth.new([], [], false, [])
-      end
-
-      items = project.dig(:items, :nodes) || []
-      cards = items.map { |item| build_card(item) }
-
-      status_options = project.dig(:fields, :nodes).to_a.filter_map do |field|
-        next unless field[:__typename] == "ProjectV2SingleSelectField"
-        next unless field[:name].to_s.casecmp("Status").zero?
-
-        (field[:options] || []).map { |option| option[:name] }
-      end.flatten.compact
-
-      archived_column_exists = status_options.any? { |name| name.to_s.casecmp("archived").zero? }
-
-      stale_cutoff = Time.current - stale_after_days.days
-      stale_cards = stale_cards(cards, stale_cutoff: stale_cutoff)
-
-      BoardHealth.new(cards, status_options, archived_column_exists, stale_cards)
-    rescue StandardError => e
-      @logger.error("GitHub project board query failed: #{e.class} - #{e.message}")
-      BoardHealth.new([], [], false, [])
     end
   end
 
@@ -277,32 +289,43 @@ class GithubService
   def commit_metrics_by_user(repo, start_date, end_date)
     return {} unless @client
 
-    commits = commits_in_range(repo, start_date, end_date)
-    metrics = Hash.new { |hash, key| hash[key] = { commit_count: 0, lines_added: 0, lines_removed: 0 } }
+    start_time = normalize_time(start_date)
+    end_time = normalize_time(end_date)
 
-    commits.each do |commit|
-      username = commit.author&.login || commit.commit&.author&.name
-      next if username.blank?
+    cache_fetch(
+      "commit_metrics_by_user",
+      repo,
+      start_time&.iso8601,
+      end_time&.iso8601,
+      expires_in: 10.minutes
+    ) do
+      commits = commits_in_range(repo, start_time, end_time)
+      metrics = Hash.new { |hash, key| hash[key] = { commit_count: 0, lines_added: 0, lines_removed: 0 } }
 
-      details = @client.commit(repo, commit.sha)
-      added = details.stats&.additions.to_i
-      removed = details.stats&.deletions.to_i
+      commits.each do |commit|
+        username = commit.author&.login || commit.commit&.author&.name
+        next if username.blank?
 
-      data = metrics[username]
-      data[:commit_count] += 1
-      data[:lines_added] += added
-      data[:lines_removed] += removed
-    rescue Octokit::NotFound
-      next
-    end
+        details = commit_details(repo, commit.sha)
+        added = details.stats&.additions.to_i
+        removed = details.stats&.deletions.to_i
 
-    metrics.transform_values do |value|
-      CBPResult.new(
-        value[:commit_count],
-        value[:lines_added],
-        value[:lines_removed],
-        value[:lines_added] + value[:lines_removed]
-      )
+        data = metrics[username]
+        data[:commit_count] += 1
+        data[:lines_added] += added
+        data[:lines_removed] += removed
+      rescue Octokit::NotFound
+        next
+      end
+
+      metrics.transform_values do |value|
+        CBPResult.new(
+          value[:commit_count],
+          value[:lines_added],
+          value[:lines_removed],
+          value[:lines_added] + value[:lines_removed]
+        )
+      end
     end
   rescue StandardError => e
     @logger.error("Commit aggregate query failed for #{repo}: #{e.class} - #{e.message}")
@@ -351,53 +374,62 @@ class GithubService
 
     start_time = normalize_time(start_date)
     end_time = normalize_time(end_date)
-    pulls = pull_requests(repo)
 
-    metrics = Hash.new do |hash, key|
-      hash[key] = {
-        opened_count: 0,
-        merged_count: 0,
-        open_count: 0,
-        merge_hours_total: 0.0,
-        merge_hours_samples: 0
-      }
-    end
+    cache_fetch(
+      "pr_metrics_by_user",
+      repo,
+      start_time&.iso8601,
+      end_time&.iso8601,
+      expires_in: 10.minutes
+    ) do
+      pulls = pull_requests(repo)
 
-    pulls.each do |pull|
-      username = pull.user&.login
-      next if username.blank?
+      metrics = Hash.new do |hash, key|
+        hash[key] = {
+          opened_count: 0,
+          merged_count: 0,
+          open_count: 0,
+          merge_hours_total: 0.0,
+          merge_hours_samples: 0
+        }
+      end
 
-      opened_at = safe_parse_time(pull.created_at)
-      merged_at = safe_parse_time(pull.merged_at)
-      next unless within_range?(opened_at || merged_at, start_time, end_time)
+      pulls.each do |pull|
+        username = pull.user&.login
+        next if username.blank?
 
-      data = metrics[username]
-      data[:opened_count] += 1
+        opened_at = safe_parse_time(pull.created_at)
+        merged_at = safe_parse_time(pull.merged_at)
+        next unless within_range?(opened_at || merged_at, start_time, end_time)
 
-      if merged_at.present?
-        data[:merged_count] += 1
-        if opened_at.present?
-          data[:merge_hours_total] += ((merged_at - opened_at) / 1.hour)
-          data[:merge_hours_samples] += 1
+        data = metrics[username]
+        data[:opened_count] += 1
+
+        if merged_at.present?
+          data[:merged_count] += 1
+          if opened_at.present?
+            data[:merge_hours_total] += ((merged_at - opened_at) / 1.hour)
+            data[:merge_hours_samples] += 1
+          end
+        elsif pull.state.to_s.casecmp("open").zero?
+          data[:open_count] += 1
         end
-      elsif pull.state.to_s.casecmp("open").zero?
-        data[:open_count] += 1
-      end
-    end
-
-    metrics.transform_values do |value|
-      avg_merge_hours = if value[:merge_hours_samples].positive?
-        (value[:merge_hours_total] / value[:merge_hours_samples]).round(1)
-      else
-        0.0
       end
 
-      PRResult.new(
-        value[:opened_count],
-        value[:merged_count],
-        value[:open_count],
-        avg_merge_hours
-      )
+      metrics.transform_values do |value|
+        avg_merge_hours = if value[:merge_hours_samples].positive?
+          (value[:merge_hours_total] / value[:merge_hours_samples]).round(1)
+        else
+          0.0
+        end
+
+        PRResult.new(
+          value[:opened_count],
+          value[:merged_count],
+          value[:open_count],
+          avg_merge_hours
+        )
+      end
     end
   rescue StandardError => e
     @logger.error("PR query failed for #{repo}: #{e.class} - #{e.message}")
@@ -409,36 +441,50 @@ class GithubService
 
     start_time = normalize_time(start_date)
     end_time = normalize_time(end_date)
-    pulls = pull_requests(repo)
 
-    metrics = Hash.new do |hash, key|
-      hash[key] = { review_count: 0, approvals: 0, changes_requested: 0 }
-    end
-
-    pulls.each do |pull|
-      reviews = pull_request_reviews(repo, pull.number)
-      reviews.each do |review|
-        username = review.user&.login
-        next if username.blank?
-
-        submitted_at = safe_parse_time(review.submitted_at)
-        next unless within_range?(submitted_at, start_time, end_time)
-
-        data = metrics[username]
-        data[:review_count] += 1
-
-        state = review.state.to_s.upcase
-        data[:approvals] += 1 if state == "APPROVED"
-        data[:changes_requested] += 1 if state == "CHANGES_REQUESTED"
+    cache_fetch(
+      "review_metrics_by_user",
+      repo,
+      start_time&.iso8601,
+      end_time&.iso8601,
+      expires_in: 10.minutes
+    ) do
+      pulls = pull_requests(repo)
+      relevant_pulls = pulls.select do |pull|
+        opened_at = safe_parse_time(pull.created_at)
+        merged_at = safe_parse_time(pull.merged_at)
+        within_range?(opened_at || merged_at, start_time, end_time)
       end
-    end
 
-    metrics.transform_values do |value|
-      ReviewResult.new(
-        value[:review_count],
-        value[:approvals],
-        value[:changes_requested]
-      )
+      metrics = Hash.new do |hash, key|
+        hash[key] = { review_count: 0, approvals: 0, changes_requested: 0 }
+      end
+
+      relevant_pulls.each do |pull|
+        reviews = pull_request_reviews(repo, pull.number)
+        reviews.each do |review|
+          username = review.user&.login
+          next if username.blank?
+
+          submitted_at = safe_parse_time(review.submitted_at)
+          next unless within_range?(submitted_at, start_time, end_time)
+
+          data = metrics[username]
+          data[:review_count] += 1
+
+          state = review.state.to_s.upcase
+          data[:approvals] += 1 if state == "APPROVED"
+          data[:changes_requested] += 1 if state == "CHANGES_REQUESTED"
+        end
+      end
+
+      metrics.transform_values do |value|
+        ReviewResult.new(
+          value[:review_count],
+          value[:approvals],
+          value[:changes_requested]
+        )
+      end
     end
   rescue StandardError => e
     @logger.error("Review query failed for #{repo}: #{e.class} - #{e.message}")
@@ -456,7 +502,21 @@ class GithubService
 
   private
 
+  def cache_fetch(metric_name, *parts, expires_in:)
+    key = ["github_service", metric_name, @cache_namespace, *parts.map(&:to_s)]
+    Rails.cache.fetch(key, expires_in: expires_in) { yield }
+  end
+
+  def commit_details(repo, sha)
+    cache_key = [repo, sha]
+    return @commit_details_cache[cache_key] if @commit_details_cache.key?(cache_key)
+
+    @commit_details_cache[cache_key] = @client.commit(repo, sha)
+  end
+
   def pull_requests(repo)
+    return @pull_requests_cache[repo] if @pull_requests_cache.key?(repo)
+
     pulls = []
     page = 1
 
@@ -468,13 +528,16 @@ class GithubService
       page += 1
     end
 
-    pulls
+    @pull_requests_cache[repo] = pulls
   rescue Octokit::NotFound
     @logger.warn("Repository not found for pull request query: #{repo}")
-    []
+    @pull_requests_cache[repo] = []
   end
 
   def pull_request_reviews(repo, pull_number)
+    cache_key = [repo, pull_number]
+    return @pull_request_reviews_cache[cache_key] if @pull_request_reviews_cache.key?(cache_key)
+
     reviews = []
     page = 1
 
@@ -486,9 +549,9 @@ class GithubService
       page += 1
     end
 
-    reviews
+    @pull_request_reviews_cache[cache_key] = reviews
   rescue Octokit::NotFound
-    []
+    @pull_request_reviews_cache[cache_key] = []
   end
 
   def within_range?(time, start_time, end_time)

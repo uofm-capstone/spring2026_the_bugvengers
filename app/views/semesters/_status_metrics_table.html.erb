@@ -19,7 +19,7 @@
               when "FA"   then "<strong>Feature Assignments</strong><br><b>Metric:</b> Number of cards assigned to this student in this sprint."
               when "TE"   then "<strong>Time Estimate</strong><br><b>Metric:</b> Estimated hours for this student's sprint cards."
               when "TT"   then "<strong>Time Taken</strong><br><b>Metric:</b> Logged hours from Kanban Time Taken / Time Spent fields for this student's sprint cards."
-              when "KU"   then "<strong>Kanban Updates</strong><br><b>Metric:</b> Kanban quality score for this sprint. Chips show supporting GitHub sub-signals (GH composite, CBP, PR, RVW)."
+              when "KU"   then "<strong>Kanban Updates (KU)</strong><br><b>What it measures:</b> How well completed work is documented on the Kanban board.<br><b>Formula (0-100):</b><br>KU = 20 base + 40% TE completeness + 40% TT completeness<br><b>Base 20:</b> Team has at least 1 done card (student row: student has at least 1 assigned card).<br><b>TE completeness:</b> % of done cards with Time Estimate > 0.<br><b>TT completeness:</b> % of done cards with Time Taken/Spent > 0.<br><b>Done cards include:</b> Done, Archived, and Done in Sprint X.<br><b>Bands:</b> Healthy >= 85, Watch >= 70, At Risk < 70."
               when "PP"   then "<strong>Product Progress</strong><br><b>Metric:</b> Done ratio for sprint cards in scope, with completion band."
               else "<strong>Metric</strong><br><b>Metric:</b> Description unavailable."
             end %>

@@ -17,6 +17,13 @@
           <span>Estimate: <%= payload[:total_estimate] %>h</span>
           <span>Taken: <%= payload[:total_spent] %>h</span>
           <span>Done Missing TT: <%= payload[:cards_missing_spent] %></span>
+          <span>Repo: <%= payload[:github_repo] || "N/A" %></span>
+          <span>GitHub Score: <%= payload.dig(:github_scores, :score) || 0 %>%</span>
+          <span>Data Available: <%= payload.dig(:github_scores, :data_available) ? "Yes" : "No" %></span>
+          <span>Missing Flags: <%= format_missing_github_flags(payload.dig(:github_scores, :missing_data_flags)) %></span>
+          <span>CBP: <%= payload.dig(:github_scores, :cbp_score) || 0 %></span>
+          <span>PR: <%= payload.dig(:github_scores, :pr_score) || 0 %></span>
+          <span>RVW: <%= payload.dig(:github_scores, :review_score) || 0 %></span>
         </div>
 
         <details class="github-inspector-card-samples">

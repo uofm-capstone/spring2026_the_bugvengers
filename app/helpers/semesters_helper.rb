@@ -46,4 +46,21 @@ module SemestersHelper
     list.present? ? list.join(", ") : "None"
   end
 
+  def github_score_state_class(score)
+    value = score.to_f
+    return "is-strong" if value >= 85
+    return "is-solid" if value >= 70
+    return "is-watch" if value >= 55
+
+    "is-risk"
+  end
+
+  def compact_score(value)
+    format("%.1f", value.to_f)
+  end
+
+  def format_missing_github_flags(flags)
+    Array(flags).map { |flag| flag.to_s.tr("_", " ") }.map(&:capitalize).join(", ")
+  end
+
 end

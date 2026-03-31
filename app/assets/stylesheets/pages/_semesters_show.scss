@@ -158,3 +158,62 @@
   font-size: 0.75rem;
   border-top: 2px solid #c4d3f3;
 }
+
+.github-score-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.github-score-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  padding: 1px 8px;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.github-score-badge.is-strong {
+  background: #e8f8ee;
+  color: #196f3d;
+}
+
+.github-score-badge.is-solid {
+  background: #ecf4ff;
+  color: #1a4f9c;
+}
+
+.github-score-badge.is-watch {
+  background: #fff7e5;
+  color: #9a6700;
+}
+
+.github-score-badge.is-risk {
+  background: #fff0ed;
+  color: #a62d1d;
+}
+
+.github-band {
+  font-size: 0.66rem;
+  color: #53607a;
+  font-weight: 600;
+}
+
+.github-score-chips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 2px;
+}
+
+.github-chip {
+  font-size: 0.62rem;
+  background: #eff3fa;
+  color: #293858;
+  border-radius: 999px;
+  padding: 1px 6px;
+  line-height: 1.3;
+}

@@ -1,6 +1,13 @@
 # app/controllers/semesters_controller.rb
 class SemestersController < ApplicationController
   require 'text'
+  GITHUB_SCORE_WEIGHTS = {
+    kanban: 0.35,
+    cbp: 0.30,
+    pr: 0.20,
+    review: 0.15
+  }.freeze
+
   helper_method :get_client_score
   helper_method :team_exist
   helper_method :get_flags
@@ -352,7 +359,9 @@ def status
       team_service = GithubService.new(team: team, user: current_user)
       board_health = team_service.board_health(team.project_board_url)
       project_cards = board_health.cards
+      repo = team_service.parse_repo_url(team.repo_url)
       sprint_cards_by_name = {}
+      github_metrics_by_sprint = {}
 
       @team_project_data[team.id] = project_cards
       @team_board_health[team.id] = board_health
@@ -365,11 +374,20 @@ def status
         sprint_cards = cards_for_sprint(project_cards, sprint)
         sprint_cards_by_name[sprint.name] = sprint_cards
 
+        github_metrics = build_github_sprint_metrics(
+          team_service: team_service,
+          repo: repo,
+          sprint: sprint,
+          students: team.students
+        )
+        github_metrics_by_sprint[sprint.name] = github_metrics
+
         team_metric = build_team_sprint_metrics(
           sprint_cards: sprint_cards,
           board_health: board_health,
           sprint: sprint,
-          students: team.students
+          students: team.students,
+          github_metrics: github_metrics
         )
         @team_sprint_metrics[team.id][sprint.name] = team_metric
 
@@ -381,6 +399,8 @@ def status
           total_estimate: team_metric[:estimated_hours],
           total_spent: team_metric[:time_spent_hours],
           cards_missing_spent: team_metric[:cards_missing_time_spent],
+          github_repo: repo,
+          github_scores: team_metric[:github],
           card_time_samples: sprint_cards.map { |card| card_time_sample(card) }
         }
       end
@@ -393,7 +413,8 @@ def status
             sprint_cards: sprint_cards_by_name[sprint.name],
             board_health: board_health,
             student: student,
-            sprint: sprint
+            sprint: sprint,
+            github_student_metrics: github_metrics_by_sprint.dig(sprint.name, :per_student, student.github_username)
           )
         end
       end
@@ -515,7 +536,7 @@ end
 
   private
 
-  def build_live_status_metrics(sprint_cards:, board_health:, student:, sprint:)
+  def build_live_status_metrics(sprint_cards:, board_health:, student:, sprint:, github_student_metrics: nil)
     columns = @service.get_card_count_per_column(sprint_cards)
     sprint_done_count = sprint_cards.count { |card| done_in_sprint_status?(card.status, sprint.name) }
     done_in_any_sprint_count = sprint_cards.count { |card| done_in_any_sprint_status?(card.status) }
@@ -542,6 +563,71 @@ end
     done_status_total = per_student_column_counts["Done"] + per_student_column_counts["Archived"] +
                         per_student_column_counts.select { |status_name, _count| done_in_any_sprint_status?(status_name) }.values.sum
 
+    student_done_scope_cards = sprint_cards.select do |card|
+      next false unless card.assignees.include?(student.github_username)
+
+      status = card.status.to_s
+      done_in_any_sprint_status?(status) || status.casecmp("Done").zero? || status.casecmp("Archived").zero?
+    end
+    student_done_scope_count = student_done_scope_cards.size
+    student_done_with_estimate_pct = percentage(
+      student_done_scope_cards.count { |card| estimate_value(card).positive? },
+      student_done_scope_count
+    )
+    student_done_with_time_taken_pct = percentage(
+      student_done_scope_cards.count { |card| spent_value(card).positive? },
+      student_done_scope_count
+    )
+    # KU focuses on documentation hygiene for completed student work.
+    student_kanban_score = (
+      (assigned_card_count.positive? ? 20.0 : 0.0) +
+      (student_done_with_estimate_pct * 0.40) +
+      (student_done_with_time_taken_pct * 0.40)
+    ).round(1)
+    student_kanban_band = assigned_card_count.zero? ? "No Data" : ku_band_for(student_kanban_score)
+
+    student_pp_completion_pct = percentage(done_status_total, assigned_card_count).round(1)
+    student_pp_band = assigned_card_count.zero? ? "No Data" : pp_band_for(student_pp_completion_pct)
+
+    github_student_metrics ||= empty_student_github_metrics
+    cbp_data = github_student_metrics[:cbp] || {}
+    pr_data = github_student_metrics[:pr] || {}
+    review_data = github_student_metrics[:review] || {}
+    missing_data_flags = Array(github_student_metrics[:missing_data_flags])
+
+    cbp_score = score_cbp(
+      commit_count: cbp_data[:commit_count].to_i,
+      lines_changed: cbp_data[:lines_changed].to_i
+    )
+    pr_score = score_pr(
+      opened_count: pr_data[:opened_count].to_i,
+      merged_count: pr_data[:merged_count].to_i,
+      open_count: pr_data[:open_count].to_i,
+      avg_merge_hours: pr_data[:avg_merge_hours].to_f
+    )
+    review_score = score_review(
+      review_count: review_data[:review_count].to_i,
+      approvals: review_data[:approvals].to_i,
+      changes_requested: review_data[:changes_requested].to_i
+    )
+    has_non_kanban_github_data = (
+      cbp_data[:commit_count].to_i.positive? ||
+      pr_data[:opened_count].to_i.positive? ||
+      review_data[:review_count].to_i.positive?
+    )
+
+    github_score = (
+      (student_kanban_score * GITHUB_SCORE_WEIGHTS[:kanban]) +
+      (cbp_score * GITHUB_SCORE_WEIGHTS[:cbp]) +
+      (pr_score * GITHUB_SCORE_WEIGHTS[:pr]) +
+      (review_score * GITHUB_SCORE_WEIGHTS[:review])
+    ).round(1)
+    github_band = if assigned_card_count.zero? && !has_non_kanban_github_data
+      "No Data"
+    else
+      github_band_for(github_score)
+    end
+
     {
       fsd: {
         backlog: per_student_column_counts["Backlog"],
@@ -559,8 +645,8 @@ end
         time_spent_hours: time_spent_hours.round(1)
       },
       ku: {
-        archived_column_exists: board_health.archived_column_exists,
-        stale_team_tasks: board_health.stale_cards.count
+        score: student_kanban_score,
+        band: student_kanban_band
       },
       pp: {
         current_board_done_cards: current_board_done_count,
@@ -568,12 +654,27 @@ end
         done_in_any_sprint_cards: done_in_any_sprint_count,
         archived_cards: archived_count,
         active_now_cards: active_now_count,
-        total_cards: total_count
+        total_cards: total_count,
+        completion_pct: student_pp_completion_pct,
+        band: student_pp_band
+      },
+      cbp: cbp_data,
+      pr: pr_data,
+      review: review_data,
+      github: {
+        score: github_score,
+        band: github_band,
+        cbp_score: cbp_score,
+        pr_score: pr_score,
+        review_score: review_score,
+        kanban_score: student_kanban_score,
+        data_available: github_student_metrics[:data_available],
+        missing_data_flags: missing_data_flags
       }
     }
   end
 
-  def build_team_sprint_metrics(sprint_cards:, board_health:, sprint:, students:)
+  def build_team_sprint_metrics(sprint_cards:, board_health:, sprint:, students:, github_metrics: nil)
     columns = @service.get_card_count_per_column(sprint_cards)
     sprint_done_count = sprint_cards.count { |card| done_in_sprint_status?(card.status, sprint.name) }
     done_in_any_sprint_count = sprint_cards.count { |card| done_in_any_sprint_status?(card.status) }
@@ -591,6 +692,51 @@ end
 
     done_status_total = columns["Done"] + columns["Archived"] +
                         columns.select { |status_name, _count| done_in_any_sprint_status?(status_name) }.values.sum
+
+    done_scope_cards = sprint_cards.select do |card|
+      status = card.status.to_s
+      done_in_any_sprint_status?(status) || status.casecmp("Done").zero? || status.casecmp("Archived").zero?
+    end
+
+    done_scope_count = done_scope_cards.size
+    done_with_estimate_count = done_scope_cards.count { |card| estimate_value(card).positive? }
+    done_with_time_taken_count = done_scope_cards.count { |card| spent_value(card).positive? }
+    done_with_estimate_pct = percentage(done_with_estimate_count, done_scope_count)
+    done_with_time_taken_pct = percentage(done_with_time_taken_count, done_scope_count)
+
+    ku_score = (
+      (done_scope_count.positive? ? 20.0 : 0.0) +
+      (done_with_estimate_pct * 0.40) +
+      (done_with_time_taken_pct * 0.40)
+    ).round(1)
+    ku_band = total_count.zero? ? "No Data" : ku_band_for(ku_score)
+
+    github_metrics ||= empty_team_github_metrics
+    cbp_score = score_cbp(
+      commit_count: github_metrics.dig(:cbp, :total_commits).to_i,
+      lines_changed: github_metrics.dig(:cbp, :total_lines_changed).to_i
+    )
+    pr_score = score_pr(
+      opened_count: github_metrics.dig(:pr, :opened_count).to_i,
+      merged_count: github_metrics.dig(:pr, :merged_count).to_i,
+      open_count: github_metrics.dig(:pr, :open_count).to_i,
+      avg_merge_hours: github_metrics.dig(:pr, :avg_merge_hours).to_f
+    )
+    review_score = score_review(
+      review_count: github_metrics.dig(:review, :review_count).to_i,
+      approvals: github_metrics.dig(:review, :approvals).to_i,
+      changes_requested: github_metrics.dig(:review, :changes_requested).to_i
+    )
+    github_composite_score = (
+      (ku_score * GITHUB_SCORE_WEIGHTS[:kanban]) +
+      (cbp_score * GITHUB_SCORE_WEIGHTS[:cbp]) +
+      (pr_score * GITHUB_SCORE_WEIGHTS[:pr]) +
+      (review_score * GITHUB_SCORE_WEIGHTS[:review])
+    ).round(1)
+    github_band = github_metrics[:data_available] ? github_band_for(github_composite_score) : "No Data"
+
+    pp_completion_pct = percentage(done_status_total, total_count).round(1)
+    pp_band = total_count.zero? ? "No Data" : pp_band_for(pp_completion_pct)
 
     risk_reasons = []
     risk_reasons << "No cards in Done in #{sprint.name}" if sprint_done_count.zero?
@@ -614,10 +760,191 @@ end
       time_spent_hours: time_spent_hours.round(1),
       cards_missing_time_spent: cards_missing_time_spent,
       total_cards: total_count,
+      ku_score: ku_score,
+      ku_band: ku_band,
+      ku_done_with_estimate_pct: done_with_estimate_pct.round(1),
+      ku_done_with_time_taken_pct: done_with_time_taken_pct.round(1),
+      pp_completion_pct: pp_completion_pct,
+      pp_band: pp_band,
+      github: {
+        score: github_composite_score,
+        band: github_band,
+        cbp_score: cbp_score,
+        pr_score: pr_score,
+        review_score: review_score,
+        kanban_score: ku_score,
+        cbp: github_metrics[:cbp],
+        pr: github_metrics[:pr],
+        review: github_metrics[:review],
+        data_available: github_metrics[:data_available],
+        missing_data_flags: github_metrics[:missing_data_flags]
+      },
       missing_sprint_done: sprint_done_count.zero?,
       at_risk: risk_reasons.any?,
       at_risk_reasons: risk_reasons
     }
+  end
+
+  def build_github_sprint_metrics(team_service:, repo:, sprint:, students:)
+    return empty_team_github_metrics(missing_data_flags: ["repo_missing"]) if repo.blank?
+    return empty_team_github_metrics(repo: repo, missing_data_flags: ["token_unavailable"]) unless team_service.available?
+
+    start_date = sprint.start_date || Date.current.beginning_of_month
+    end_date = sprint.end_date || Date.current.end_of_month
+
+    cbp_by_user = team_service.commit_metrics_by_user(repo, start_date, end_date)
+    pr_by_user = team_service.pr_metrics_by_user(repo, start_date, end_date)
+    review_by_user = team_service.review_metrics_by_user(repo, start_date, end_date)
+
+    per_student = {}
+    students.each do |student|
+      username = student.github_username.to_s
+      next if username.blank?
+
+      cbp = cbp_by_user[username] || GithubService::CBPResult.new(0, 0, 0, 0)
+      pr = pr_by_user[username] || GithubService::PRResult.new(0, 0, 0, 0)
+      review = review_by_user[username] || GithubService::ReviewResult.new(0, 0, 0)
+
+      per_student[username] = {
+        data_available: true,
+        missing_data_flags: [],
+        cbp: {
+          commit_count: cbp.commit_count,
+          lines_added: cbp.lines_added,
+          lines_removed: cbp.lines_removed,
+          lines_changed: cbp.lines_changed
+        },
+        pr: {
+          opened_count: pr.opened_count,
+          merged_count: pr.merged_count,
+          open_count: pr.open_count,
+          avg_merge_hours: pr.avg_merge_hours
+        },
+        review: {
+          review_count: review.review_count,
+          approvals: review.approvals,
+          changes_requested: review.changes_requested
+        }
+      }
+    end
+
+    cbp_totals = per_student.values.map { |metric| metric[:cbp] }
+    pr_totals = per_student.values.map { |metric| metric[:pr] }
+    review_totals = per_student.values.map { |metric| metric[:review] }
+
+    {
+      data_available: true,
+      repo: repo,
+      cbp: {
+        total_commits: cbp_totals.sum { |metric| metric[:commit_count].to_i },
+        total_lines_changed: cbp_totals.sum { |metric| metric[:lines_changed].to_i },
+        active_contributors: cbp_totals.count { |metric| metric[:commit_count].to_i.positive? }
+      },
+      pr: {
+        opened_count: pr_totals.sum { |metric| metric[:opened_count].to_i },
+        merged_count: pr_totals.sum { |metric| metric[:merged_count].to_i },
+        open_count: pr_totals.sum { |metric| metric[:open_count].to_i },
+        avg_merge_hours: average(pr_totals.filter_map { |metric| metric[:avg_merge_hours].to_f.positive? ? metric[:avg_merge_hours].to_f : nil })
+      },
+      review: {
+        review_count: review_totals.sum { |metric| metric[:review_count].to_i },
+        approvals: review_totals.sum { |metric| metric[:approvals].to_i },
+        changes_requested: review_totals.sum { |metric| metric[:changes_requested].to_i }
+      },
+      missing_data_flags: [],
+      per_student: per_student
+    }
+  rescue StandardError
+    empty_team_github_metrics(repo: repo, missing_data_flags: ["github_query_failed"])
+  end
+
+  def empty_student_github_metrics
+    {
+      data_available: false,
+      missing_data_flags: ["repo_or_token_missing"],
+      cbp: { commit_count: 0, lines_added: 0, lines_removed: 0, lines_changed: 0 },
+      pr: { opened_count: 0, merged_count: 0, open_count: 0, avg_merge_hours: 0.0 },
+      review: { review_count: 0, approvals: 0, changes_requested: 0 }
+    }
+  end
+
+  def empty_team_github_metrics(repo: nil, missing_data_flags: [])
+    {
+      data_available: false,
+      repo: repo,
+      cbp: { total_commits: 0, total_lines_changed: 0, active_contributors: 0 },
+      pr: { opened_count: 0, merged_count: 0, open_count: 0, avg_merge_hours: 0.0 },
+      review: { review_count: 0, approvals: 0, changes_requested: 0 },
+      missing_data_flags: Array(missing_data_flags),
+      per_student: {}
+    }
+  end
+
+  def score_cbp(commit_count:, lines_changed:)
+    commit_component = [commit_count.to_i * 12.0, 60.0].min
+    churn_component = [(lines_changed.to_f / 40.0), 40.0].min
+    bounded_score(commit_component + churn_component)
+  end
+
+  def score_pr(opened_count:, merged_count:, open_count:, avg_merge_hours:)
+    opened_component = [opened_count.to_i * 8.0, 35.0].min
+    merged_component = [merged_count.to_i * 12.0, 45.0].min
+    open_penalty = [open_count.to_i * 4.0, 20.0].min
+
+    merge_velocity_bonus = if avg_merge_hours.to_f.positive?
+      [(36.0 / avg_merge_hours.to_f) * 20.0, 20.0].min
+    else
+      0.0
+    end
+
+    bounded_score(opened_component + merged_component + merge_velocity_bonus - open_penalty)
+  end
+
+  def score_review(review_count:, approvals:, changes_requested:)
+    review_component = [review_count.to_i * 8.0, 55.0].min
+    approval_component = [approvals.to_i * 10.0, 35.0].min
+    changes_penalty = [changes_requested.to_i * 3.0, 20.0].min
+
+    bounded_score(review_component + approval_component - changes_penalty)
+  end
+
+  def github_band_for(score)
+    return "Strong" if score >= 85
+    return "Solid" if score >= 70
+    return "Watch" if score >= 55
+
+    "At Risk"
+  end
+
+  def bounded_score(score)
+    [[score.to_f, 0.0].max, 100.0].min.round(1)
+  end
+
+  def average(values)
+    list = Array(values)
+    return 0.0 if list.blank?
+
+    (list.sum.to_f / list.size).round(1)
+  end
+
+  def ku_band_for(score)
+    return "Healthy" if score >= 85
+    return "Watch" if score >= 70
+
+    "At Risk"
+  end
+
+  def pp_band_for(score)
+    return "On Track" if score >= 80
+    return "Monitor" if score >= 60
+
+    "Behind"
+  end
+
+  def percentage(numerator, denominator)
+    return 0.0 if denominator.to_i <= 0
+
+    (numerator.to_f / denominator.to_f) * 100.0
   end
 
   def done_in_sprint_status?(status, sprint_name)

@@ -19,8 +19,8 @@
               when "FA"   then "<strong>Feature Assignments</strong><br><b>Metric:</b> Number of cards assigned to this student in this sprint."
               when "TE"   then "<strong>Time Estimate</strong><br><b>Metric:</b> Estimated hours for this student's sprint cards."
               when "TT"   then "<strong>Time Taken</strong><br><b>Metric:</b> Logged hours from Kanban Time Taken / Time Spent fields for this student's sprint cards."
-              when "KU"   then "<strong>Kanban Updates</strong><br><b>Metric:</b> Board health indicators for sprint cards."
-              when "PP"   then "<strong>Product Progress</strong><br><b>Metric:</b> Done on board vs Done in this sprint."
+              when "KU"   then "<strong>Kanban Updates</strong><br><b>Metric:</b> Kanban quality score for this sprint. Chips show supporting GitHub sub-signals (GH composite, CBP, PR, RVW)."
+              when "PP"   then "<strong>Product Progress</strong><br><b>Metric:</b> Done ratio for sprint cards in scope, with completion band."
               else "<strong>Metric</strong><br><b>Metric:</b> Description unavailable."
             end %>
 
@@ -80,9 +80,33 @@
                     <% when "TT" %>
                       <%= metric.dig(:ts, :time_spent_hours) || 0 %>
                     <% when "KU" %>
-                      <span class="text-muted">-</span>
+                      <% ku_metric = metric[:ku] || {} %>
+                      <% github_metric = metric[:github] || {} %>
+                      <div class="github-score-cell">
+                        <% if ku_metric[:band] != "No Data" %>
+                          <span class="github-score-badge <%= github_score_state_class(ku_metric[:score]) %>">
+                            <%= ku_metric[:score] || 0 %>%
+                          </span>
+                          <span class="github-band"><%= ku_metric[:band] || "No Data" %></span>
+                        <% else %>
+                          <span class="github-score-badge is-watch">N/A</span>
+                          <span class="github-band">No Data</span>
+                        <% end %>
+                        <div class="github-score-chips">
+                          <span class="github-chip">GH <%= compact_score(github_metric[:score]) %></span>
+                          <span class="github-chip">CBP <%= compact_score(github_metric[:cbp_score]) %></span>
+                          <span class="github-chip">PR <%= compact_score(github_metric[:pr_score]) %></span>
+                          <span class="github-chip">RVW <%= compact_score(github_metric[:review_score]) %></span>
+                        </div>
+                        <% if Array(github_metric[:missing_data_flags]).any? %>
+                          <span class="github-band"><%= format_missing_github_flags(github_metric[:missing_data_flags]) %></span>
+                        <% end %>
+                      </div>
                     <% when "PP" %>
-                      <span class="text-muted">-</span>
+                      <% done_count = metric.dig(:fsd, :done).to_i %>
+                      <% total_count = metric.dig(:fa, :assigned_cards).to_i %>
+                      <%= (metric.dig(:pp, :completion_pct) || 0) %>% (<%= metric.dig(:pp, :band) || "No Data" %>)
+                      <div class="github-band"><%= done_count %>/<%= total_count %> done</div>
 
                     <% else %>
                       <span>-</span>
@@ -115,9 +139,30 @@
                   <% when "TT" %>
                     <strong><%= team_metric[:time_spent_hours] || 0 %></strong>
                   <% when "KU" %>
-                    <strong>Archived: <%= team_metric[:archived_column_exists] ? 'Yes' : 'No' %> | Missing TT: <%= team_metric[:cards_missing_time_spent] || 0 %></strong>
+                    <% github_metric = team_metric[:github] || {} %>
+                    <div class="github-score-cell">
+                      <% if team_metric[:ku_band] != "No Data" %>
+                        <strong class="github-score-badge <%= github_score_state_class(team_metric[:ku_score]) %>">
+                          <%= team_metric[:ku_score] || 0 %>%
+                        </strong>
+                        <span class="github-band"><%= team_metric[:ku_band] || "No Data" %></span>
+                      <% else %>
+                        <strong class="github-score-badge is-watch">N/A</strong>
+                        <span class="github-band">No Data</span>
+                      <% end %>
+                      <div class="github-score-chips">
+                        <span class="github-chip">GH <%= compact_score(github_metric[:score]) %></span>
+                        <span class="github-chip">CBP <%= compact_score(github_metric[:cbp_score]) %></span>
+                        <span class="github-chip">PR <%= compact_score(github_metric[:pr_score]) %></span>
+                        <span class="github-chip">RVW <%= compact_score(github_metric[:review_score]) %></span>
+                      </div>
+                      <% if Array(github_metric[:missing_data_flags]).any? %>
+                        <span class="github-band"><%= format_missing_github_flags(github_metric[:missing_data_flags]) %></span>
+                      <% end %>
+                    </div>
                   <% when "PP" %>
-                    <strong>Done: <%= team_metric[:current_board_done_cards] || 0 %> | <%= sprint %>: <%= team_metric[:sprint_done_cards] || 0 %></strong>
+                    <strong><%= team_metric[:pp_completion_pct] || 0 %>% (<%= team_metric[:pp_band] || "No Data" %>)</strong>
+                    <div class="github-band"><%= team_metric[:done_cards].to_i %>/<%= team_metric[:total_cards].to_i %> done</div>
                   <% else %>
                     <span>-</span>
                 <% end %>

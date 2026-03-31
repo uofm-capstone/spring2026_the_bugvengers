@@ -4,6 +4,8 @@ require "octokit"
 class GithubService
   CardInfo = Struct.new(:title, :status, :assignees, :fields, :type, :updated_at)
   CBPResult = Struct.new(:commit_count, :lines_added, :lines_removed, :lines_changed)
+  PRResult = Struct.new(:opened_count, :merged_count, :open_count, :avg_merge_hours)
+  ReviewResult = Struct.new(:review_count, :approvals, :changes_requested)
   BoardHealth = Struct.new(:cards, :status_options, :archived_column_exists, :stale_cards)
 
   def self.resolve_token(token: nil, team: nil, user: nil)
@@ -344,6 +346,105 @@ class GithubService
     CBPResult.new(0, 0, 0, 0)
   end
 
+  def pr_metrics_by_user(repo, start_date, end_date)
+    return {} unless @client
+
+    start_time = normalize_time(start_date)
+    end_time = normalize_time(end_date)
+    pulls = pull_requests(repo)
+
+    metrics = Hash.new do |hash, key|
+      hash[key] = {
+        opened_count: 0,
+        merged_count: 0,
+        open_count: 0,
+        merge_hours_total: 0.0,
+        merge_hours_samples: 0
+      }
+    end
+
+    pulls.each do |pull|
+      username = pull.user&.login
+      next if username.blank?
+
+      opened_at = safe_parse_time(pull.created_at)
+      merged_at = safe_parse_time(pull.merged_at)
+      next unless within_range?(opened_at || merged_at, start_time, end_time)
+
+      data = metrics[username]
+      data[:opened_count] += 1
+
+      if merged_at.present?
+        data[:merged_count] += 1
+        if opened_at.present?
+          data[:merge_hours_total] += ((merged_at - opened_at) / 1.hour)
+          data[:merge_hours_samples] += 1
+        end
+      elsif pull.state.to_s.casecmp("open").zero?
+        data[:open_count] += 1
+      end
+    end
+
+    metrics.transform_values do |value|
+      avg_merge_hours = if value[:merge_hours_samples].positive?
+        (value[:merge_hours_total] / value[:merge_hours_samples]).round(1)
+      else
+        0.0
+      end
+
+      PRResult.new(
+        value[:opened_count],
+        value[:merged_count],
+        value[:open_count],
+        avg_merge_hours
+      )
+    end
+  rescue StandardError => e
+    @logger.error("PR query failed for #{repo}: #{e.class} - #{e.message}")
+    {}
+  end
+
+  def review_metrics_by_user(repo, start_date, end_date)
+    return {} unless @client
+
+    start_time = normalize_time(start_date)
+    end_time = normalize_time(end_date)
+    pulls = pull_requests(repo)
+
+    metrics = Hash.new do |hash, key|
+      hash[key] = { review_count: 0, approvals: 0, changes_requested: 0 }
+    end
+
+    pulls.each do |pull|
+      reviews = pull_request_reviews(repo, pull.number)
+      reviews.each do |review|
+        username = review.user&.login
+        next if username.blank?
+
+        submitted_at = safe_parse_time(review.submitted_at)
+        next unless within_range?(submitted_at, start_time, end_time)
+
+        data = metrics[username]
+        data[:review_count] += 1
+
+        state = review.state.to_s.upcase
+        data[:approvals] += 1 if state == "APPROVED"
+        data[:changes_requested] += 1 if state == "CHANGES_REQUESTED"
+      end
+    end
+
+    metrics.transform_values do |value|
+      ReviewResult.new(
+        value[:review_count],
+        value[:approvals],
+        value[:changes_requested]
+      )
+    end
+  rescue StandardError => e
+    @logger.error("Review query failed for #{repo}: #{e.class} - #{e.message}")
+    {}
+  end
+
   def parse_repo_url(repo_url)
     return nil if repo_url.blank?
 
@@ -354,6 +455,47 @@ class GithubService
   end
 
   private
+
+  def pull_requests(repo)
+    pulls = []
+    page = 1
+
+    loop do
+      batch = @client.pull_requests(repo, state: "all", per_page: 100, page: page)
+      break if batch.blank?
+
+      pulls.concat(batch)
+      page += 1
+    end
+
+    pulls
+  rescue Octokit::NotFound
+    @logger.warn("Repository not found for pull request query: #{repo}")
+    []
+  end
+
+  def pull_request_reviews(repo, pull_number)
+    reviews = []
+    page = 1
+
+    loop do
+      batch = @client.pull_request_reviews(repo, pull_number, per_page: 100, page: page)
+      break if batch.blank?
+
+      reviews.concat(batch)
+      page += 1
+    end
+
+    reviews
+  rescue Octokit::NotFound
+    []
+  end
+
+  def within_range?(time, start_time, end_time)
+    return false if time.blank? || start_time.blank? || end_time.blank?
+
+    time >= start_time && time <= end_time
+  end
 
   def parse_project_url(project_url)
     return [nil, nil] if project_url.blank?

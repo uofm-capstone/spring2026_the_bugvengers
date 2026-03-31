@@ -120,6 +120,7 @@
     } 
 
     let statusProgressTimer;
+    let statusFallbackAttempts = 0;
 
     function setStatusProgress(value, label) {
       const bar = document.getElementById("status-load-bar");
@@ -156,13 +157,20 @@
       }
     }
 
+    function hasRenderableStatusContent(frame) {
+      if (!frame) return false;
+
+      // Success states: full metrics table rendered, or explicit no-team warning.
+      return Boolean(frame.querySelector(".team-status-table") || frame.querySelector(".alert-warning"));
+    }
+
     // Fallback loader: only runs if Turbo frame hydration appears stuck.
     async function ensureStatusContentLoaded() {
       const frame = document.getElementById("semester-status-content");
       if (!frame) return;
 
       // Skip if content appears loaded already.
-      if (frame.querySelector(".team-status-table") || frame.dataset.loaded === "1") return;
+      if (hasRenderableStatusContent(frame) || frame.dataset.loaded === "1") return;
       if (frame.hasAttribute("busy")) return;
       if (frame.dataset.fallbackFetchStarted === "1") return;
 
@@ -184,9 +192,14 @@
         const returnedFrame = parsed.getElementById("semester-status-content");
 
         frame.innerHTML = returnedFrame ? returnedFrame.innerHTML : html;
-        frame.dataset.loaded = "1";
-        completeStatusProgress("Status metrics loaded.");
-        initTooltipsAndSprintFilter();
+
+        if (hasRenderableStatusContent(frame)) {
+          frame.dataset.loaded = "1";
+          completeStatusProgress("Status metrics loaded.");
+          initTooltipsAndSprintFilter();
+        } else {
+          setStatusProgress(95, "Still loading metrics... retrying.");
+        }
       } catch (_e) {
       } finally {
         frame.dataset.fallbackFetchStarted = "0";
@@ -194,10 +207,19 @@
     }
 
     function scheduleStatusFallback() {
-      setTimeout(() => {
+      setTimeout(async () => {
         const frame = document.getElementById("semester-status-content");
         if (!frame || frame.dataset.loaded === "1") return;
-        ensureStatusContentLoaded();
+
+        // Allow Turbo enough time first; then do up to 3 guarded retries.
+        if (!frame.hasAttribute("busy") && statusFallbackAttempts < 3) {
+          statusFallbackAttempts += 1;
+          await ensureStatusContentLoaded();
+        }
+
+        if (frame.dataset.loaded !== "1" && statusFallbackAttempts < 3) {
+          scheduleStatusFallback();
+        }
       }, 3500);
     }
 
@@ -207,9 +229,13 @@
     document.addEventListener("turbo:load", startStatusProgress);
     document.addEventListener("turbo:frame-load", (event) => {
       if (event.target && event.target.id === "semester-status-content") {
-        event.target.dataset.loaded = "1";
-        completeStatusProgress("Status metrics loaded.");
-        initTooltipsAndSprintFilter();
+        if (hasRenderableStatusContent(event.target)) {
+          event.target.dataset.loaded = "1";
+          completeStatusProgress("Status metrics loaded.");
+          initTooltipsAndSprintFilter();
+        } else {
+          setStatusProgress(95, "Still loading metrics...");
+        }
       }
     });
     document.addEventListener("DOMContentLoaded", scheduleStatusFallback);

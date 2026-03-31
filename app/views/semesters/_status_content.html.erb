@@ -1,0 +1,114 @@
+<%= turbo_frame_tag "semester-status-content" do %>
+  <div class="row">
+    <div class="mt-4 text-center">
+      <% if team_exist(@teams) %>
+      <h2>Team Status</h2>
+
+      <div class="mt-3 mb-3">
+        <h5>Legend:</h5>
+        <ul class="list-inline team-status-legend">
+          <li class="list-inline-item team-status-legend-item">
+            <span
+              class="ui-tooltip"
+              tabindex="0"
+              aria-label="Good: everything required is present."
+              data-tooltip="Good: Everything required is present (no warnings).">
+              <%= image_tag "check-circle-fill.svg", class: "team-status-icon", alt: "", aria: { hidden: true } %>
+            </span>
+            <span>Good</span>
+          </li>
+
+          <li class="list-inline-item team-status-legend-item">
+            <span
+              class="ui-tooltip"
+              tabindex="0"
+              aria-label="Acceptable: some data may be missing, but not critical."
+              data-tooltip="Acceptable: Minor issues or partial data; review if needed.">
+              <%= image_tag "exclamation-circle-fill-yellow.svg", class: "team-status-icon", alt: "", aria: { hidden: true } %>
+            </span>
+            <span>Acceptable</span>
+          </li>
+
+          <li class="list-inline-item team-status-legend-item">
+            <span
+              class="ui-tooltip"
+              tabindex="0"
+              aria-label="Poor: action needed."
+              data-tooltip="Poor: Missing submissions or low scores; action needed.">
+              <%= image_tag "exclamation-triangle-fill-red.svg", class: "team-status-icon", alt: "", aria: { hidden: true } %>
+            </span>
+            <span>Poor</span>
+          </li>
+
+          <li class="list-inline-item team-status-legend-item">
+            <span
+              class="ui-tooltip"
+              tabindex="0"
+              aria-label="No data: nothing recorded yet."
+              data-tooltip="No Data: No submission/metric recorded yet.">
+              <%= image_tag "question-circle-fill.svg", class: "team-status-icon", alt: "", aria: { hidden: true } %>
+            </span>
+            <span>No Data</span>
+          </li>
+        </ul>
+      </div>
+
+      <%= render "semesters/status_filters", sprint_list: @sprint_list %>
+      <% if @show_github_inspector %>
+        <%= render "semesters/github_data_inspector", teams: @teams, github_inspector: @github_inspector %>
+      <% end %>
+
+      <%= render "semesters/status_metrics_table",
+        sprint_list: @sprint_list,
+        teams: @teams,
+        team_overview_by_id: @team_overview_by_id,
+        semester: @semester,
+        team_sprint_metrics: @team_sprint_metrics,
+        status_metrics: @status_metrics %>
+
+      <!-- Deadline Cards -->
+      <div class="container mt-4">
+        <h3 class="text-center mb-4">Set Sprint Deadlines</h3>
+
+        <%= form_with url: save_sprints_semester_path(@semester), method: :post, local: true do %>
+          <div class="d-flex flex-nowrap justify-content-between gap-3 px-2">
+            <% (1..4).each do |i| %>
+              <% sprint = @semester.sprints.find_by(name: "Sprint #{i}") || Sprint.new(name: "Sprint #{i}") %>
+
+              <div class="card small-card flex-fill mx-1" style="min-width: 0;">
+                <div class="card-body p-2">
+                  <h6 class="card-title mb-2 text-center">Sprint <%= i %></h6>
+
+                  <div class="mb-1">
+                    <%= label_tag "sprint_#{i}[planning_deadline]", "Planning Deadline", class: "form-label mb-0" %>
+                    <%= date_field_tag "sprint_#{i}[planning_deadline]", sprint.planning_deadline, class: "form-control form-control-sm" %>
+                  </div>
+
+                  <div class="mb-1">
+                    <%= label_tag "sprint_#{i}[progress_deadline]", "Progress Check", class: "form-label mb-0" %>
+                    <%= date_field_tag "sprint_#{i}[progress_deadline]", sprint.progress_deadline, class: "form-control form-control-sm" %>
+                  </div>
+
+                  <div class="mb-1">
+                    <%= label_tag "sprint_#{i}[demo_deadline]", "Demo Deadline", class: "form-label mb-0" %>
+                    <%= date_field_tag "sprint_#{i}[demo_deadline]", sprint.demo_deadline, class: "form-control form-control-sm" %>
+                  </div>
+                </div>
+              </div>
+            <% end %>
+          </div>
+
+          <div class="text-center mt-3">
+            <%= submit_tag "Save All Deadlines", class: "btn btn-primary px-4" %>
+          </div>
+        <% end %>
+      </div>
+      <% else %>
+        <h2>Team Status</h2>
+        <div class="alert alert-warning" role="status">
+          No teams found for this semester, so status metrics cannot be displayed yet.
+        </div>
+      <% end %>
+    </div>
+  </div>
+<% end %>

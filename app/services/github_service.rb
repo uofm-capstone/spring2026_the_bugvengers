@@ -9,6 +9,33 @@ class GithubService
   ReviewResult = Struct.new(:review_count, :approvals, :changes_requested)
   BoardHealth = Struct.new(:cards, :status_options, :archived_column_exists, :stale_cards)
 
+  class << self
+    def shared_cache
+      @shared_cache ||= {}
+    end
+
+    def shared_cache_lock
+      @shared_cache_lock ||= Mutex.new
+    end
+
+    def shared_cache_fetch(key, expires_in:)
+      now = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+
+      shared_cache_lock.synchronize do
+        entry = shared_cache[key]
+        return entry[:value] if entry && entry[:expires_at] > now
+      end
+
+      value = yield
+      shared_cache_lock.synchronize do
+        shared_cache[key] = { value: value, expires_at: now + expires_in.to_f }
+        shared_cache.shift if shared_cache.size > 800
+      end
+
+      value
+    end
+  end
+
   def self.resolve_token(token: nil, team: nil, user: nil)
     candidates = [
       token,
@@ -504,7 +531,15 @@ class GithubService
 
   def cache_fetch(metric_name, *parts, expires_in:)
     key = ["github_service", metric_name, @cache_namespace, *parts.map(&:to_s)]
-    Rails.cache.fetch(key, expires_in: expires_in) { yield }
+    if rails_cache_enabled?
+      Rails.cache.fetch(key, expires_in: expires_in) { yield }
+    else
+      self.class.shared_cache_fetch(key, expires_in: expires_in) { yield }
+    end
+  end
+
+  def rails_cache_enabled?
+    !Rails.cache.class.name.include?("NullStore")
   end
 
   def commit_details(repo, sha)

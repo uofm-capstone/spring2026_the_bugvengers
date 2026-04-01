@@ -74,12 +74,9 @@ class GithubService
       }
     )
 
-    begin
-      @client.user
-    rescue Octokit::Unauthorized
-      @logger.error("GithubService token is invalid or expired")
-      @client = nil
-    end
+    # Do not eagerly call the GitHub user endpoint here; this constructor
+    # can be invoked multiple times per request, and a blocking auth check
+    # significantly increases first-load latency.
   end
 
   def available?

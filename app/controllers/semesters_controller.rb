@@ -343,20 +343,13 @@ end
 
     session[:last_viewed_semester_id] = @semester.id
 
-    begin
-      Timeout.timeout(18) do
-        build_status_payload!
-      end
+    build_status_payload!
+    @show_github_inspector = current_user.admin? && params[:debug] == "github"
 
-      @show_github_inspector = current_user.admin? && params[:debug] == "github"
-      render partial: "semesters/status_content"
-    rescue Timeout::Error
-      Rails.logger.warn("Status content build timed out for semester #{params[:id]}")
-      render partial: "semesters/status_content_timeout"
-    rescue StandardError => e
-      Rails.logger.error("Status content build failed for semester #{params[:id]}: #{e.class} - #{e.message}")
-      render partial: "semesters/status_content_timeout"
-    end
+    render partial: "semesters/status_content"
+  rescue StandardError => e
+    Rails.logger.error("Status content build failed for semester #{params[:id]}: #{e.class} - #{e.message}")
+    render partial: "semesters/status_content_timeout"
   end
 
   # --------------------------------------------------------
@@ -478,7 +471,7 @@ end
 
     @teams.each do |team|
       team_service = GithubService.new(team: team, user: current_user)
-      board_health = team_service.board_health(team.project_board_url)
+      board_health = safe_board_health(team_service: team_service, team: team)
       project_cards = board_health.cards
       repo = team_service.parse_repo_url(team.repo_url)
       sprint_cards_by_name = {}
@@ -495,11 +488,12 @@ end
         sprint_cards = cards_for_sprint(project_cards, sprint)
         sprint_cards_by_name[sprint.name] = sprint_cards
 
-        github_metrics = build_github_sprint_metrics(
+        github_metrics = safe_github_sprint_metrics(
           team_service: team_service,
           repo: repo,
           sprint: sprint,
-          students: team.students
+          students: team.students,
+          team: team
         )
         github_metrics_by_sprint[sprint.name] = github_metrics
 
@@ -559,6 +553,35 @@ end
     end
 
     @team_overview_by_id = @team_status_overview.index_by { |summary| summary[:team_id] }
+  end
+
+  def safe_board_health(team_service:, team:)
+    Timeout.timeout(10) do
+      team_service.board_health(team.project_board_url)
+    end
+  rescue Timeout::Error
+    Rails.logger.warn("Board health query timed out for team #{team.id}")
+    GithubService::BoardHealth.new([], [], false, [])
+  rescue StandardError => e
+    Rails.logger.warn("Board health query failed for team #{team.id}: #{e.class} - #{e.message}")
+    GithubService::BoardHealth.new([], [], false, [])
+  end
+
+  def safe_github_sprint_metrics(team_service:, repo:, sprint:, students:, team:)
+    Timeout.timeout(8) do
+      build_github_sprint_metrics(
+        team_service: team_service,
+        repo: repo,
+        sprint: sprint,
+        students: students
+      )
+    end
+  rescue Timeout::Error
+    Rails.logger.warn("GitHub sprint metrics timed out for team #{team.id}, sprint #{sprint.name}")
+    empty_team_github_metrics(repo: repo, missing_data_flags: ["github_query_timeout"])
+  rescue StandardError => e
+    Rails.logger.warn("GitHub sprint metrics failed for team #{team.id}, sprint #{sprint.name}: #{e.class} - #{e.message}")
+    empty_team_github_metrics(repo: repo, missing_data_flags: ["github_query_failed"])
   end
 
   def build_live_status_metrics(sprint_cards:, board_health:, student:, sprint:, github_student_metrics: nil)

@@ -25,7 +25,7 @@
 }
 
 .semesters-show .tooltip-inner {
-  max-width: 250px;
+  max-width: 320px;
   font-size: 0.85rem;
   line-height: 1.4;
   text-align: left;
@@ -35,4 +35,185 @@
 .semesters-show .sprint-toggle.active {
   background-color: var(--bs-primary);
   color: var(--bs-white);
+}
+
+.semesters-show .team-filter.active {
+  color: #fff;
+  background-color: #1f4cb2;
+  border-color: #1f4cb2;
+}
+
+.team-overview-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+}
+
+.team-overview-card {
+  border: 1px solid #d9e2f7;
+  border-radius: 8px;
+  background: #f8fbff;
+  padding: 12px;
+  text-align: left;
+}
+
+.team-overview-name {
+  font-size: 1rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+.team-overview-meta {
+  color: #5b6680;
+  font-size: 0.85rem;
+}
+
+.team-overview-risk {
+  color: #8a2415;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.team-overview-ok {
+  color: #2c6f43;
+  font-size: 0.78rem;
+}
+
+.team-overview-sprints {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.team-overview-sprint-pill {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  font-size: 0.8rem;
+  border-radius: 999px;
+  padding: 4px 10px;
+}
+
+.team-overview-sprint-pill.is-healthy {
+  background: #eaf8ef;
+  color: #145f31;
+}
+
+.team-overview-sprint-pill.is-risk {
+  background: #fff3f0;
+  color: #9f2f1d;
+}
+
+.github-inspector {
+  text-align: left;
+  border: 1px solid #d8deea;
+  border-radius: 8px;
+  background: #f8fafc;
+  padding: 10px 12px;
+}
+
+.github-inspector summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.github-inspector-team {
+  border-top: 1px dashed #c7cfdf;
+  padding-top: 10px;
+}
+
+.github-inspector-sprint {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 0.82rem;
+  padding: 2px 0;
+}
+
+.team-risk-badge {
+  display: inline-block;
+  margin-left: 8px;
+  font-size: 0.7rem;
+  color: #fff;
+  background: #b5392c;
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+
+.status-metric-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: left;
+  font-size: 0.78rem;
+  line-height: 1.25;
+}
+
+.team-total-row {
+  background: #eef4ff;
+}
+
+.team-total-row td {
+  font-size: 0.75rem;
+  border-top: 2px solid #c4d3f3;
+}
+
+.github-score-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.github-score-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  padding: 1px 8px;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.github-score-badge.is-strong {
+  background: #e8f8ee;
+  color: #196f3d;
+}
+
+.github-score-badge.is-solid {
+  background: #ecf4ff;
+  color: #1a4f9c;
+}
+
+.github-score-badge.is-watch {
+  background: #fff7e5;
+  color: #9a6700;
+}
+
+.github-score-badge.is-risk {
+  background: #fff0ed;
+  color: #a62d1d;
+}
+
+.github-band {
+  font-size: 0.66rem;
+  color: #53607a;
+  font-weight: 600;
+}
+
+.github-score-chips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 2px;
+}
+
+.github-chip {
+  font-size: 0.62rem;
+  background: #eff3fa;
+  color: #293858;
+  border-radius: 999px;
+  padding: 1px 6px;
+  line-height: 1.3;
 }

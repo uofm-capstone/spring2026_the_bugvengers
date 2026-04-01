@@ -17,6 +17,7 @@ Rails.application.routes.draw do
   get 'semesters/:id/edit', to: 'semesters#edit', as: 'edit_semester'
   get 'semesters/:id', to: 'semesters#show', as: 'semester'
   get 'semesters/:id/status', to: 'semesters#status', as:'semester_status'
+  get 'semesters/:id/status_content', to: 'semesters#status_content', as: 'semester_status_content'
   patch 'semesters/:id', to: 'semesters#update'
   delete 'semesters/:id', to: 'semesters#destroy'
   get 'semesters/:semester_id/team/', to: "semesters#team", as: 'semester_team'
@@ -47,10 +48,6 @@ Rails.application.routes.draw do
   delete 'semesters/:semester_id/sprints/:id', to: 'sprints#destroy'
   put 'semesters/:semester_id/sprints/:id', to: 'sprints#update'
   get 'semesters/:semester_id/sprints/:id/edit', to: 'sprints#edit', as: 'edit_semester_sprint'
-
-  resources :semesters do
-    post :save_sprints, on: :member
-  end
 
   # Team controller
   resources :teams do

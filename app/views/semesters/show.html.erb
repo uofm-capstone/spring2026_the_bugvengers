@@ -35,7 +35,7 @@
         </div>
 
         <%= turbo_frame_tag "semester-status-content",
-          src: semester_status_content_path(@semester, debug: params[:debug]) do %>
+          data: { status_src: semester_status_content_path(@semester, debug: params[:debug]) } do %>
           <div class="text-center text-muted py-3" id="status-frame-placeholder">
             Status request started. Waiting for server response...
           </div>
@@ -121,10 +121,7 @@
     let statusProgressTimer;
     let statusElapsedTimer;
     let statusElapsedSeconds = 0;
-    let statusFallbackAttempts = 0;
-    const STATUS_ENABLE_FALLBACK = false;
-    const STATUS_MAX_FALLBACK_ATTEMPTS = 12;
-    const STATUS_FALLBACK_FETCH_TIMEOUT_MS = 12000;
+    const STATUS_REQUEST_TIMEOUT_MS = 30000;
 
     function setStatusDebug(message) {
       const debug = document.getElementById("status-load-debug");
@@ -150,7 +147,6 @@
       clearInterval(statusProgressTimer);
       clearInterval(statusElapsedTimer);
       statusElapsedSeconds = 0;
-      statusFallbackAttempts = 0;
       let value = 8;
       ensurePanelVisible();
       setStatusProgress(value, "Fetching Kanban + GitHub data...");
@@ -209,33 +205,25 @@
     }
 
     // Fallback loader: only runs if Turbo frame hydration appears stuck.
-    async function ensureStatusContentLoaded() {
-      if (!STATUS_ENABLE_FALLBACK) return;
-
+    async function requestStatusContent() {
       const frame = document.getElementById("semester-status-content");
       if (!frame) return;
 
-      // Skip if content appears loaded already.
-      if (hasRenderableStatusContent(frame) || frame.dataset.loaded === "1") return;
-      if (frame.hasAttribute("busy")) {
-        setStatusDebug("frame busy, waiting for response");
-        return;
-      }
-      if (frame.dataset.fallbackFetchStarted === "1") return;
+      if (frame.dataset.requestStarted === "1") return;
+      frame.dataset.requestStarted = "1";
 
-      const src = frame.getAttribute("src");
+      const src = frame.dataset.statusSrc;
       if (!src) return;
 
       let controller;
       let timeoutId;
 
       try {
-        frame.dataset.fallbackFetchStarted = "1";
-        setStatusDebug("fallback fetch in progress");
+        setStatusDebug("request in progress");
 
         if (typeof AbortController !== "undefined") {
           controller = new AbortController();
-          timeoutId = setTimeout(() => controller.abort(), STATUS_FALLBACK_FETCH_TIMEOUT_MS);
+          timeoutId = setTimeout(() => controller.abort(), STATUS_REQUEST_TIMEOUT_MS);
         }
 
         const response = await fetch(src, {
@@ -245,68 +233,46 @@
           credentials: "same-origin",
           signal: controller ? controller.signal : undefined
         });
-        if (!response.ok) return;
-        setStatusDebug(`fallback response ${response.status}`);
+        if (!response.ok) throw new Error(`HTTP_${response.status}`);
+        setStatusDebug(`response ${response.status}`);
 
         const html = await response.text();
         const parsed = new DOMParser().parseFromString(html, "text/html");
         const returnedFrame = parsed.getElementById("semester-status-content");
 
-        // Only inject known status payload shapes to avoid replacing the frame
-        // with unrelated HTML (e.g., redirects or full-page responses).
         if (returnedFrame) {
           frame.innerHTML = returnedFrame.innerHTML;
         } else if (parsed.querySelector('[data-status-content-ready="1"]')) {
           frame.innerHTML = html;
+        } else {
+          throw new Error("MISSING_READY_MARKER");
         }
 
         if (hasRenderableStatusContent(frame)) {
           frame.dataset.loaded = "1";
           completeStatusProgress("Status metrics loaded.");
           initTooltipsAndSprintFilter();
-        } else {
-          setStatusProgress(95, "Still loading metrics... retrying.");
-          setStatusDebug("response parsed, ready marker not found yet");
         }
       } catch (e) {
-        if (e && e.name === "AbortError") {
-          setStatusProgress(94, "Still loading metrics... retrying request.");
-          setStatusDebug("fallback fetch timed out; scheduling retry");
-        } else {
-          setStatusDebug(`fallback fetch error: ${e && e.name ? e.name : "unknown"}`);
+        const panel = document.getElementById("status-load-panel");
+        if (panel) {
+          panel.classList.remove("alert-success");
+          panel.classList.add("alert-warning");
         }
+
+        if (e && e.name === "AbortError") {
+          setStatusProgress(95, "Status request timed out. Please refresh to retry.");
+          setStatusDebug("request timed out");
+        } else {
+          setStatusProgress(95, "Status request failed. Please refresh to retry.");
+          setStatusDebug(`request failed: ${e && e.message ? e.message : "unknown"}`);
+        }
+
+        clearInterval(statusProgressTimer);
+        clearInterval(statusElapsedTimer);
       } finally {
         if (timeoutId) clearTimeout(timeoutId);
-        frame.dataset.fallbackFetchStarted = "0";
       }
-    }
-
-    function scheduleStatusFallback() {
-      if (!STATUS_ENABLE_FALLBACK) return;
-
-      setTimeout(async () => {
-        const frame = document.getElementById("semester-status-content");
-        if (!frame || frame.dataset.loaded === "1") return;
-
-        // Allow Turbo enough time first; then do guarded retries while waiting.
-        if (!frame.hasAttribute("busy") && statusFallbackAttempts < STATUS_MAX_FALLBACK_ATTEMPTS) {
-          statusFallbackAttempts += 1;
-          setStatusDebug(`retry ${statusFallbackAttempts}/${STATUS_MAX_FALLBACK_ATTEMPTS}`);
-          await ensureStatusContentLoaded();
-        }
-
-        if (frame.dataset.loaded !== "1" && statusFallbackAttempts < STATUS_MAX_FALLBACK_ATTEMPTS) {
-          scheduleStatusFallback();
-        } else if (frame.dataset.loaded !== "1") {
-          setStatusProgress(96, "Still loading metrics. GitHub requests are taking longer than usual.");
-          const panel = document.getElementById("status-load-panel");
-          if (panel) {
-            panel.classList.remove("alert-success");
-            panel.classList.add("alert-info");
-          }
-          setStatusDebug("still waiting after retries");
-        }
-      }, 5000);
     }
 
     function attachFrameDiagnostics() {
@@ -316,27 +282,12 @@
       frame.dataset.diagnosticsBound = "1";
 
       const observer = new MutationObserver(() => {
-        const busy = frame.hasAttribute("busy") ? "yes" : "no";
         const loaded = frame.dataset.loaded === "1" ? "yes" : "no";
         const hasMarker = hasRenderableStatusContent(frame) ? "yes" : "no";
-        const fallback = frame.dataset.fallbackFetchStarted === "1" ? "yes" : "no";
-        setStatusDebug(`busy=${busy}, fallback=${fallback}, loaded=${loaded}, marker=${hasMarker}`);
+        setStatusDebug(`loaded=${loaded}, marker=${hasMarker}`);
       });
 
       observer.observe(frame, { attributes: true, childList: true, subtree: true });
-
-      frame.addEventListener("turbo:before-fetch-request", () => {
-        setStatusDebug("turbo fetch started");
-      });
-
-      frame.addEventListener("turbo:before-fetch-response", (event) => {
-        const statusCode = event?.detail?.fetchResponse?.statusCode;
-        setStatusDebug(`turbo response received (${statusCode || "unknown"})`);
-      });
-
-      frame.addEventListener("turbo:fetch-request-error", () => {
-        setStatusDebug("turbo fetch request error");
-      });
     }
 
     document.addEventListener("DOMContentLoaded", initTooltipsAndSprintFilter);
@@ -345,17 +296,6 @@
     document.addEventListener("turbo:load", startStatusProgress);
     document.addEventListener("DOMContentLoaded", attachFrameDiagnostics);
     document.addEventListener("turbo:load", attachFrameDiagnostics);
-    document.addEventListener("turbo:frame-load", (event) => {
-      if (event.target && event.target.id === "semester-status-content") {
-        if (hasRenderableStatusContent(event.target)) {
-          event.target.dataset.loaded = "1";
-          completeStatusProgress("Status metrics loaded.");
-          initTooltipsAndSprintFilter();
-        } else {
-          setStatusProgress(95, "Still loading metrics...");
-        }
-      }
-    });
-    document.addEventListener("DOMContentLoaded", scheduleStatusFallback);
-    document.addEventListener("turbo:load", scheduleStatusFallback);
+    document.addEventListener("DOMContentLoaded", requestStatusContent);
+    document.addEventListener("turbo:load", requestStatusContent);
   </script>

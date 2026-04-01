@@ -40,11 +40,13 @@ class GithubService
   end
 
   def self.resolve_token(token: nil, team: nil, user: nil)
+    # Prefer explicit/team/user credentials over ENV so reviewer/admin accounts
+    # can load data without depending on a global deployment token.
     candidates = [
       token,
-      ENV["GITHUB_PAT"],
       team&.github_token,
-      user&.github_token
+      user&.github_token,
+      ENV["GITHUB_PAT"]
     ]
 
     candidates.find { |value| value.present? }

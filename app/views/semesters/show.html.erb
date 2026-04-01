@@ -22,19 +22,13 @@
         <div class="row">
           <div class="mt-4 text-center">
             <h2>Team Status</h2>
-            <div class="alert alert-info" role="status" id="status-load-panel" style="opacity:1 !important; visibility:visible !important; transition:none !important;">
+            <div class="alert alert-info border border-info" role="status" id="status-load-panel" style="opacity:1 !important; visibility:visible !important; transition:none !important; background:#e9f7fb; color:#0f2940;">
               <div class="mb-2">Loading status metrics from GitHub. This page is ready while data loads.</div>
-              <div class="progress" style="height: 0.9rem;">
-                <div
-                  id="status-load-bar"
-                  class="progress-bar progress-bar-striped progress-bar-animated"
-                  role="progressbar"
-                  style="width: 8%; opacity:1 !important;"
-                  aria-valuemin="0"
-                  aria-valuemax="100"
-                  aria-valuenow="8">8%</div>
+              <div class="d-flex align-items-center justify-content-center gap-2">
+                <div class="spinner-border spinner-border-sm text-primary" role="status" aria-hidden="true" id="status-load-spinner"></div>
+                <strong id="status-load-text">Fetching Kanban + GitHub data...</strong>
               </div>
-              <small id="status-load-text" class="d-block mt-2 text-dark">Fetching Kanban + GitHub data...</small>
+              <small id="status-load-elapsed" class="d-block mt-2" style="color:#1e3a52;">Elapsed: 0s</small>
               <small id="status-load-debug" class="d-block mt-1 text-secondary">Frame state: initializing</small>
             </div>
           </div>
@@ -125,6 +119,8 @@
     } 
 
     let statusProgressTimer;
+    let statusElapsedTimer;
+    let statusElapsedSeconds = 0;
     let statusFallbackAttempts = 0;
     const STATUS_MAX_FALLBACK_ATTEMPTS = 12;
     const STATUS_FALLBACK_FETCH_TIMEOUT_MS = 12000;
@@ -144,42 +140,54 @@
     }
 
     function setStatusProgress(value, label) {
-      const bar = document.getElementById("status-load-bar");
       const text = document.getElementById("status-load-text");
       ensurePanelVisible();
-      if (bar) {
-        const bounded = Math.max(0, Math.min(100, value));
-        bar.style.width = `${bounded}%`;
-        bar.setAttribute("aria-valuenow", bounded.toString());
-        bar.textContent = `${bounded}%`;
-      }
       if (text && label) text.textContent = label;
     }
 
     function startStatusProgress() {
       clearInterval(statusProgressTimer);
+      clearInterval(statusElapsedTimer);
+      statusElapsedSeconds = 0;
       let value = 8;
       ensurePanelVisible();
       setStatusProgress(value, "Fetching Kanban + GitHub data...");
       setStatusDebug("request in progress");
 
+      const elapsed = document.getElementById("status-load-elapsed");
+      if (elapsed) elapsed.textContent = "Elapsed: 0s";
+
+      statusElapsedTimer = setInterval(() => {
+        statusElapsedSeconds += 1;
+        if (elapsed) elapsed.textContent = `Elapsed: ${statusElapsedSeconds}s`;
+
+        if (statusElapsedSeconds > 12 && statusElapsedSeconds <= 25) {
+          setStatusProgress(value, "Still working... checking GitHub activity.");
+        } else if (statusElapsedSeconds > 25) {
+          setStatusProgress(value, "Still working... this first load can take longer.");
+        }
+      }, 1000);
+
       // Simulate meaningful progress while waiting for network-bound API work.
       statusProgressTimer = setInterval(() => {
         value = Math.min(92, value + Math.max(1, Math.round((95 - value) * 0.12)));
-        setStatusProgress(value);
+        setStatusProgress(value, null);
       }, 450);
     }
 
     function completeStatusProgress(message) {
       clearInterval(statusProgressTimer);
+      clearInterval(statusElapsedTimer);
       setStatusProgress(100, message || "Status metrics loaded.");
       const panel = document.getElementById("status-load-panel");
       if (panel) {
         panel.classList.remove("alert-info");
         panel.classList.add("alert-success");
       }
-      const bar = document.getElementById("status-load-bar");
-      if (bar) bar.classList.remove("progress-bar-animated");
+      const spinner = document.getElementById("status-load-spinner");
+      if (spinner) spinner.style.display = "none";
+      const elapsed = document.getElementById("status-load-elapsed");
+      if (elapsed) elapsed.textContent = `Elapsed: ${statusElapsedSeconds}s`;
       setStatusDebug("content ready");
     }
 

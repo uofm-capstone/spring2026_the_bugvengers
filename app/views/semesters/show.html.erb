@@ -165,8 +165,8 @@
     function hasRenderableStatusContent(frame) {
       if (!frame) return false;
 
-      // Success states: full metrics table rendered, or explicit no-team warning.
-      return Boolean(frame.querySelector(".team-status-table") || frame.querySelector(".alert-warning"));
+      // Success state: explicit marker rendered only by _status_content partial.
+      return Boolean(frame.querySelector('[data-status-content-ready="1"]'));
     }
 
     // Fallback loader: only runs if Turbo frame hydration appears stuck.
@@ -200,7 +200,7 @@
         // with unrelated HTML (e.g., redirects or full-page responses).
         if (returnedFrame) {
           frame.innerHTML = returnedFrame.innerHTML;
-        } else if (parsed.querySelector(".team-status-table") || parsed.querySelector(".alert-warning")) {
+        } else if (parsed.querySelector('[data-status-content-ready="1"]')) {
           frame.innerHTML = html;
         }
 

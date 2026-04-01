@@ -1,4 +1,5 @@
 <%= turbo_frame_tag "semester-status-content" do %>
+  <div data-status-content-ready="1" class="d-none" aria-hidden="true"></div>
   <div class="row">
     <div class="mt-4 text-center">
       <% if team_exist(@teams) %>

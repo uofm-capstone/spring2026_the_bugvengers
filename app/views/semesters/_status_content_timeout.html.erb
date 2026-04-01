@@ -1,0 +1,14 @@
+<%= turbo_frame_tag "semester-status-content" do %>
+  <div data-status-content-ready="1" class="d-none" aria-hidden="true"></div>
+
+  <div class="row">
+    <div class="mt-4 text-center">
+      <h2>Team Status</h2>
+      <div class="alert alert-warning" role="status">
+        GitHub metrics are taking longer than expected.
+        This view timed out to keep the page responsive.
+        Please refresh Status in a few moments.
+      </div>
+    </div>
+  </div>
+<% end %>

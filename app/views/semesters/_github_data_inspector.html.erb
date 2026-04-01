@@ -1,0 +1,44 @@
+<details class="github-inspector mb-4">
+  <summary>GitHub Data Inspector (TA / Admin)</summary>
+
+  <% teams.each do |team| %>
+    <% inspector = github_inspector[team.id] || {} %>
+    <div class="github-inspector-team mt-3">
+      <h6><%= team.name %></h6>
+      <p class="mb-1"><strong>Project URL:</strong> <%= inspector[:project_url] || "N/A" %></p>
+      <p class="mb-1"><strong>Status Options:</strong> <%= Array(inspector[:status_options]).join(", ") %></p>
+      <p class="mb-2"><strong>Card Counts:</strong> <%= format_card_counts(inspector[:card_counts]) %></p>
+
+      <% (inspector[:sprint_payloads] || {}).each do |sprint_name, payload| %>
+        <div class="github-inspector-sprint">
+          <strong><%= sprint_name %></strong>
+          <span>Window: <%= payload[:start_date] %> - <%= payload[:end_date] %></span>
+          <span>Total Cards: <%= payload[:total_cards] %></span>
+          <span>Estimate: <%= payload[:total_estimate] %>h</span>
+          <span>Taken: <%= payload[:total_spent] %>h</span>
+          <span>Done Missing TT: <%= payload[:cards_missing_spent] %></span>
+          <span>Repo: <%= payload[:github_repo] || "N/A" %></span>
+          <span>GitHub Score: <%= payload.dig(:github_scores, :score) || 0 %>%</span>
+          <span>Data Available: <%= payload.dig(:github_scores, :data_available) ? "Yes" : "No" %></span>
+          <span>Missing Flags: <%= format_missing_github_flags(payload.dig(:github_scores, :missing_data_flags)) %></span>
+          <span>CBP: <%= payload.dig(:github_scores, :cbp_score) || 0 %></span>
+          <span>PR: <%= payload.dig(:github_scores, :pr_score) || 0 %></span>
+          <span>RVW: <%= payload.dig(:github_scores, :review_score) || 0 %></span>
+        </div>
+
+        <details class="github-inspector-card-samples">
+          <summary><%= sprint_name %> card TE/TT values</summary>
+          <% Array(payload[:card_time_samples]).each do |sample| %>
+            <div class="github-inspector-sprint">
+              <strong><%= sample[:title] %></strong>
+              <span>Status: <%= sample[:status] || "N/A" %></span>
+              <span>Assignees: <%= Array(sample[:assignees]).join(", ").presence || "none" %></span>
+              <span>TE: <%= sample[:estimate_value] %> (<%= sample[:estimate_field] || "no field" %>)</span>
+              <span>TT: <%= sample[:taken_value] %> (<%= sample[:taken_field] || "no field" %>)</span>
+            </div>
+          <% end %>
+        </details>
+      <% end %>
+    </div>
+  <% end %>
+</details>

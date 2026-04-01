@@ -1,6 +1,7 @@
 # app/controllers/semesters_controller.rb
 class SemestersController < ApplicationController
   require 'text'
+  require 'timeout'
   GITHUB_SCORE_WEIGHTS = {
     kanban: 0.35,
     cbp: 0.30,
@@ -342,10 +343,20 @@ end
 
     session[:last_viewed_semester_id] = @semester.id
 
-    build_status_payload!
-    @show_github_inspector = current_user.admin? && params[:debug] == "github"
+    begin
+      Timeout.timeout(18) do
+        build_status_payload!
+      end
 
-    render partial: "semesters/status_content"
+      @show_github_inspector = current_user.admin? && params[:debug] == "github"
+      render partial: "semesters/status_content"
+    rescue Timeout::Error
+      Rails.logger.warn("Status content build timed out for semester #{params[:id]}")
+      render partial: "semesters/status_content_timeout"
+    rescue StandardError => e
+      Rails.logger.error("Status content build failed for semester #{params[:id]}: #{e.class} - #{e.message}")
+      render partial: "semesters/status_content_timeout"
+    end
   end
 
   # --------------------------------------------------------

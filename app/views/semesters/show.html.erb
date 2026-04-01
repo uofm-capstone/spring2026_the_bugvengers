@@ -122,6 +122,7 @@
     let statusElapsedTimer;
     let statusElapsedSeconds = 0;
     let statusFallbackAttempts = 0;
+    const STATUS_ENABLE_FALLBACK = false;
     const STATUS_MAX_FALLBACK_ATTEMPTS = 12;
     const STATUS_FALLBACK_FETCH_TIMEOUT_MS = 12000;
 
@@ -149,10 +150,13 @@
       clearInterval(statusProgressTimer);
       clearInterval(statusElapsedTimer);
       statusElapsedSeconds = 0;
+      statusFallbackAttempts = 0;
       let value = 8;
       ensurePanelVisible();
       setStatusProgress(value, "Fetching Kanban + GitHub data...");
       setStatusDebug("request in progress");
+      const spinner = document.getElementById("status-load-spinner");
+      if (spinner) spinner.style.display = "inline-block";
 
       const elapsed = document.getElementById("status-load-elapsed");
       if (elapsed) elapsed.textContent = "Elapsed: 0s";
@@ -189,6 +193,12 @@
       const elapsed = document.getElementById("status-load-elapsed");
       if (elapsed) elapsed.textContent = `Elapsed: ${statusElapsedSeconds}s`;
       setStatusDebug("content ready");
+
+      if (panel) {
+        setTimeout(() => {
+          panel.style.display = "none";
+        }, 300);
+      }
     }
 
     function hasRenderableStatusContent(frame) {
@@ -200,6 +210,8 @@
 
     // Fallback loader: only runs if Turbo frame hydration appears stuck.
     async function ensureStatusContentLoaded() {
+      if (!STATUS_ENABLE_FALLBACK) return;
+
       const frame = document.getElementById("semester-status-content");
       if (!frame) return;
 
@@ -270,6 +282,8 @@
     }
 
     function scheduleStatusFallback() {
+      if (!STATUS_ENABLE_FALLBACK) return;
+
       setTimeout(async () => {
         const frame = document.getElementById("semester-status-content");
         if (!frame || frame.dataset.loaded === "1") return;

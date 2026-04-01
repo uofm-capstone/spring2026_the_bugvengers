@@ -22,19 +22,20 @@
         <div class="row">
           <div class="mt-4 text-center">
             <h2>Team Status</h2>
-            <div class="alert alert-info" role="status" id="status-load-panel">
+            <div class="alert alert-info" role="status" id="status-load-panel" style="opacity:1 !important; visibility:visible !important; transition:none !important;">
               <div class="mb-2">Loading status metrics from GitHub. This page is ready while data loads.</div>
               <div class="progress" style="height: 0.9rem;">
                 <div
                   id="status-load-bar"
                   class="progress-bar progress-bar-striped progress-bar-animated"
                   role="progressbar"
-                  style="width: 8%;"
+                  style="width: 8%; opacity:1 !important;"
                   aria-valuemin="0"
                   aria-valuemax="100"
                   aria-valuenow="8">8%</div>
               </div>
-              <small id="status-load-text" class="d-block mt-2 text-muted">Fetching Kanban + GitHub data...</small>
+              <small id="status-load-text" class="d-block mt-2 text-dark">Fetching Kanban + GitHub data...</small>
+              <small id="status-load-debug" class="d-block mt-1 text-secondary">Frame state: initializing</small>
             </div>
           </div>
         </div>
@@ -42,7 +43,7 @@
         <%= turbo_frame_tag "semester-status-content",
           src: semester_status_content_path(@semester, debug: params[:debug]) do %>
           <div class="text-center text-muted py-3" id="status-frame-placeholder">
-            Preparing status content...
+            Status request started. Waiting for server response...
           </div>
         <% end %>
       </div>
@@ -127,9 +128,24 @@
     let statusFallbackAttempts = 0;
     const STATUS_MAX_FALLBACK_ATTEMPTS = 12;
 
+    function setStatusDebug(message) {
+      const debug = document.getElementById("status-load-debug");
+      if (debug && message) debug.textContent = `Frame state: ${message}`;
+    }
+
+    function ensurePanelVisible() {
+      const panel = document.getElementById("status-load-panel");
+      if (!panel) return;
+
+      panel.style.display = "block";
+      panel.style.opacity = "1";
+      panel.style.visibility = "visible";
+    }
+
     function setStatusProgress(value, label) {
       const bar = document.getElementById("status-load-bar");
       const text = document.getElementById("status-load-text");
+      ensurePanelVisible();
       if (bar) {
         const bounded = Math.max(0, Math.min(100, value));
         bar.style.width = `${bounded}%`;
@@ -142,7 +158,9 @@
     function startStatusProgress() {
       clearInterval(statusProgressTimer);
       let value = 8;
+      ensurePanelVisible();
       setStatusProgress(value, "Fetching Kanban + GitHub data...");
+      setStatusDebug("request in progress");
 
       // Simulate meaningful progress while waiting for network-bound API work.
       statusProgressTimer = setInterval(() => {
@@ -161,6 +179,7 @@
       }
       const bar = document.getElementById("status-load-bar");
       if (bar) bar.classList.remove("progress-bar-animated");
+      setStatusDebug("content ready");
     }
 
     function hasRenderableStatusContent(frame) {
@@ -177,7 +196,10 @@
 
       // Skip if content appears loaded already.
       if (hasRenderableStatusContent(frame) || frame.dataset.loaded === "1") return;
-      if (frame.hasAttribute("busy")) return;
+      if (frame.hasAttribute("busy")) {
+        setStatusDebug("frame busy, waiting for response");
+        return;
+      }
       if (frame.dataset.fallbackFetchStarted === "1") return;
 
       const src = frame.getAttribute("src");
@@ -192,6 +214,7 @@
           credentials: "same-origin"
         });
         if (!response.ok) return;
+        setStatusDebug(`fallback response ${response.status}`);
 
         const html = await response.text();
         const parsed = new DOMParser().parseFromString(html, "text/html");
@@ -211,8 +234,10 @@
           initTooltipsAndSprintFilter();
         } else {
           setStatusProgress(95, "Still loading metrics... retrying.");
+          setStatusDebug("response parsed, ready marker not found yet");
         }
-      } catch (_e) {
+      } catch (e) {
+        setStatusDebug(`fallback fetch error: ${e && e.name ? e.name : "unknown"}`);
       } finally {
         frame.dataset.fallbackFetchStarted = "0";
       }
@@ -226,6 +251,7 @@
         // Allow Turbo enough time first; then do guarded retries while waiting.
         if (!frame.hasAttribute("busy") && statusFallbackAttempts < STATUS_MAX_FALLBACK_ATTEMPTS) {
           statusFallbackAttempts += 1;
+          setStatusDebug(`retry ${statusFallbackAttempts}/${STATUS_MAX_FALLBACK_ATTEMPTS}`);
           await ensureStatusContentLoaded();
         }
 
@@ -238,14 +264,46 @@
             panel.classList.remove("alert-success");
             panel.classList.add("alert-info");
           }
+          setStatusDebug("still waiting after retries");
         }
       }, 5000);
+    }
+
+    function attachFrameDiagnostics() {
+      const frame = document.getElementById("semester-status-content");
+      if (!frame || frame.dataset.diagnosticsBound === "1") return;
+
+      frame.dataset.diagnosticsBound = "1";
+
+      const observer = new MutationObserver(() => {
+        const busy = frame.hasAttribute("busy") ? "yes" : "no";
+        const loaded = frame.dataset.loaded === "1" ? "yes" : "no";
+        const hasMarker = hasRenderableStatusContent(frame) ? "yes" : "no";
+        setStatusDebug(`busy=${busy}, loaded=${loaded}, marker=${hasMarker}`);
+      });
+
+      observer.observe(frame, { attributes: true, childList: true, subtree: true });
+
+      frame.addEventListener("turbo:before-fetch-request", () => {
+        setStatusDebug("turbo fetch started");
+      });
+
+      frame.addEventListener("turbo:before-fetch-response", (event) => {
+        const statusCode = event?.detail?.fetchResponse?.statusCode;
+        setStatusDebug(`turbo response received (${statusCode || "unknown"})`);
+      });
+
+      frame.addEventListener("turbo:fetch-request-error", () => {
+        setStatusDebug("turbo fetch request error");
+      });
     }
 
     document.addEventListener("DOMContentLoaded", initTooltipsAndSprintFilter);
     document.addEventListener("turbo:load", initTooltipsAndSprintFilter);
     document.addEventListener("DOMContentLoaded", startStatusProgress);
     document.addEventListener("turbo:load", startStatusProgress);
+    document.addEventListener("DOMContentLoaded", attachFrameDiagnostics);
+    document.addEventListener("turbo:load", attachFrameDiagnostics);
     document.addEventListener("turbo:frame-load", (event) => {
       if (event.target && event.target.id === "semester-status-content") {
         if (hasRenderableStatusContent(event.target)) {

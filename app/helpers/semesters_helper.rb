@@ -62,7 +62,7 @@ module SemestersHelper
   def github_chip_tooltip(chip)
     case chip.to_s.upcase
     when "GH"
-      "GitHub Composite: weighted score from KAN (35%), CBP (30%), PR (20%), and RVW (15%)."
+      "GitHub Composite: weighted score from KU (Kanban Updates, 35%), CBP (30%), PR (20%), and RVW (15%)."
     when "CBP"
       "Coding Best Practices: based on commit activity and code churn (lines changed) during the sprint window."
     when "PR"

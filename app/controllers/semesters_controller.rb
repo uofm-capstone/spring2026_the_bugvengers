@@ -545,12 +545,15 @@ end
         @status_metrics[team.id][student.id] = {}
 
         @sprints.each do |sprint|
+          sprint_github_metrics = github_metrics_by_sprint[sprint.name] || {}
           @status_metrics[team.id][student.id][sprint.name] = build_live_status_metrics(
             sprint_cards: sprint_cards_by_name[sprint.name],
             board_health: board_health,
             student: student,
             sprint: sprint,
-            github_student_metrics: github_metrics_by_sprint.dig(sprint.name, :per_student, student.github_username)
+            github_student_metrics: sprint_github_metrics.dig(:per_student, student.github_username),
+            team_missing_data_flags: sprint_github_metrics[:missing_data_flags],
+            team_github_available: sprint_github_metrics[:data_available]
           )
         end
       end
@@ -605,7 +608,15 @@ end
     empty_team_github_metrics(repo: repo, missing_data_flags: ["github_query_failed"])
   end
 
-  def build_live_status_metrics(sprint_cards:, board_health:, student:, sprint:, github_student_metrics: nil)
+  def build_live_status_metrics(
+    sprint_cards:,
+    board_health:,
+    student:,
+    sprint:,
+    github_student_metrics: nil,
+    team_missing_data_flags: nil,
+    team_github_available: nil
+  )
     columns = @service.get_card_count_per_column(sprint_cards)
     sprint_done_count = sprint_cards.count { |card| done_in_sprint_status?(card.status, sprint.name) }
     done_in_any_sprint_count = sprint_cards.count { |card| done_in_any_sprint_status?(card.status) }
@@ -658,7 +669,13 @@ end
     student_pp_completion_pct = percentage(done_status_total, assigned_card_count).round(1)
     student_pp_band = assigned_card_count.zero? ? "No Data" : pp_band_for(student_pp_completion_pct)
 
-    github_student_metrics ||= empty_student_github_metrics
+    if github_student_metrics.blank?
+      inferred_flags = Array(team_missing_data_flags).presence || ["github_student_data_unavailable"]
+      github_student_metrics = empty_student_github_metrics(
+        missing_data_flags: inferred_flags,
+        data_available: team_github_available
+      )
+    end
     cbp_data = github_student_metrics[:cbp] || {}
     pr_data = github_student_metrics[:pr] || {}
     review_data = github_student_metrics[:review] || {}
@@ -927,10 +944,10 @@ end
     empty_team_github_metrics(repo: repo, missing_data_flags: ["github_query_failed"])
   end
 
-  def empty_student_github_metrics
+  def empty_student_github_metrics(missing_data_flags: ["repo_or_token_missing"], data_available: false)
     {
-      data_available: false,
-      missing_data_flags: ["repo_or_token_missing"],
+      data_available: !!data_available,
+      missing_data_flags: Array(missing_data_flags),
       cbp: { commit_count: 0, lines_added: 0, lines_removed: 0, lines_changed: 0 },
       pr: { opened_count: 0, merged_count: 0, open_count: 0, avg_merge_hours: 0.0 },
       review: { review_count: 0, approvals: 0, changes_requested: 0 }

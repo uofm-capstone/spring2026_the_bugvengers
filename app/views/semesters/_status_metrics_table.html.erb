@@ -98,9 +98,6 @@
                           <span class="github-chip" data-bs-toggle="tooltip" data-bs-placement="top" title="<%= github_chip_tooltip('PR') %>">PR <%= compact_score(github_metric[:pr_score]) %></span>
                           <span class="github-chip" data-bs-toggle="tooltip" data-bs-placement="top" title="<%= github_chip_tooltip('RVW') %>">RVW <%= compact_score(github_metric[:review_score]) %></span>
                         </div>
-                        <% if Array(github_metric[:missing_data_flags]).any? %>
-                          <span class="github-band"><%= format_missing_github_flags(github_metric[:missing_data_flags]) %></span>
-                        <% end %>
                       </div>
                     <% when "PP" %>
                       <% done_count = metric.dig(:fsd, :done).to_i %>
@@ -156,9 +153,6 @@
                         <span class="github-chip" data-bs-toggle="tooltip" data-bs-placement="top" title="<%= github_chip_tooltip('PR') %>">PR <%= compact_score(github_metric[:pr_score]) %></span>
                         <span class="github-chip" data-bs-toggle="tooltip" data-bs-placement="top" title="<%= github_chip_tooltip('RVW') %>">RVW <%= compact_score(github_metric[:review_score]) %></span>
                       </div>
-                      <% if Array(github_metric[:missing_data_flags]).any? %>
-                        <span class="github-band"><%= format_missing_github_flags(github_metric[:missing_data_flags]) %></span>
-                      <% end %>
                     </div>
                   <% when "PP" %>
                     <strong><%= team_metric[:pp_completion_pct] || 0 %>% (<%= team_metric[:pp_band] || "No Data" %>)</strong>

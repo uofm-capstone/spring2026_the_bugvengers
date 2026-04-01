@@ -156,10 +156,11 @@
       setStatusProgress(100, message || "Status metrics loaded.");
       const panel = document.getElementById("status-load-panel");
       if (panel) {
-        setTimeout(() => {
-          panel.style.display = "none";
-        }, 200);
+        panel.classList.remove("alert-info");
+        panel.classList.add("alert-success");
       }
+      const bar = document.getElementById("status-load-bar");
+      if (bar) bar.classList.remove("progress-bar-animated");
     }
 
     function hasRenderableStatusContent(frame) {
@@ -232,6 +233,11 @@
           scheduleStatusFallback();
         } else if (frame.dataset.loaded !== "1") {
           setStatusProgress(96, "Still loading metrics. GitHub requests are taking longer than usual.");
+          const panel = document.getElementById("status-load-panel");
+          if (panel) {
+            panel.classList.remove("alert-success");
+            panel.classList.add("alert-info");
+          }
         }
       }, 5000);
     }

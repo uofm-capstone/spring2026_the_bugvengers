@@ -363,4 +363,50 @@ class LlmServiceStandaloneTest < Minitest::Test
       assert_equal "http://34.10.73.251:11434/api/generate", captured_url
     end
   end
+
+  def test_formats_three_sentence_summary_for_display
+    service = build_service
+    text = "Overall sentiment is positive. Exceeded expectations across scale responses and strong UI progress noted. None explicitly reported."
+
+    formatted = service.format_three_sentence_summary(text)
+
+    assert_equal "Positive", formatted[:sentiment]
+    assert_includes formatted[:positives], "Exceeded expectations"
+    assert_equal "None explicitly reported.", formatted[:negatives]
+    assert_includes formatted[:bullet_text], "Overall sentiment: Positive"
+  end
+
+  def test_three_sentence_formatter_defaults_to_mixed_when_missing_label
+    service = build_service
+    text = "Team performance summary. Solid communication throughout. No major negatives."
+
+    formatted = service.format_three_sentence_summary(text)
+
+    assert_equal "Mixed", formatted[:sentiment]
+    assert_equal "Solid communication throughout.", formatted[:positives]
+    assert_equal "No major negatives.", formatted[:negatives]
+  end
+
+  def test_three_sentence_formatter_handles_markdown_labeled_sections
+    service = build_service
+    text = "**Overall Sentiment:** Positive\n\n**Notable Positives:**\n- Team consistently exceeded expectations in meeting timeliness and communication.\n\n**Notable Negatives:**\n- None explicitly reported."
+
+    formatted = service.format_three_sentence_summary(text)
+
+    assert_equal "Positive", formatted[:sentiment]
+    assert_includes formatted[:positives], "exceeded expectations"
+    assert_equal "None explicitly reported.", formatted[:negatives]
+    assert_equal "- Negatives: None explicitly reported.", formatted[:bullet_text].split("\n")[2]
+  end
+
+  def test_three_sentence_formatter_handles_positive_highlights_heading
+    service = build_service
+    text = "**Overall Sentiment:** Positive\n\n**Positive Highlights:**\n\n- The team consistently exceeded expectations in communication and preparation.\n\n**Notable Negatives:**\n\n- None explicitly reported."
+
+    formatted = service.format_three_sentence_summary(text)
+
+    assert_equal "Positive", formatted[:sentiment]
+    assert_includes formatted[:positives], "exceeded expectations"
+    assert_equal "None explicitly reported.", formatted[:negatives]
+  end
 end

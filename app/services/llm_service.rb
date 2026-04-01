@@ -78,7 +78,84 @@ class LlmService
     resolve_prompt(prompt: prompt, normalized: normalized)
   end
 
+  # Normalizes a 3-sentence summary into a deterministic display structure.
+  # Intended for UI rendering when the model output format can vary slightly.
+  def format_three_sentence_summary(text)
+    sections = extract_labeled_summary_sections(text)
+
+    if sections.values.any?(&:present?)
+      sentiment_value = extract_sentiment_label(sections[:sentiment].to_s)
+      positives_value = sections[:positives].presence || "No notable positives explicitly reported."
+      negatives_value = sections[:negatives].presence || "None explicitly reported."
+    else
+      cleaned = text.to_s.gsub("\n", " ").squeeze(" ").strip
+      parts = cleaned.split(/(?<=[.!?])\s+/).map(&:strip).reject(&:blank?)
+
+      sentiment_sentence = parts[0].to_s
+      positives_sentence = parts[1].to_s
+      negatives_sentence = parts[2].to_s
+
+      sentiment_value = extract_sentiment_label(sentiment_sentence)
+      positives_value = positives_sentence.presence || "No notable positives explicitly reported."
+      negatives_value = negatives_sentence.presence || "None explicitly reported."
+    end
+
+    {
+      sentiment: sentiment_value,
+      positives: positives_value,
+      negatives: negatives_value,
+      bullet_text: [
+        "Overall sentiment: #{sentiment_value}",
+        "- Positives: #{positives_value}",
+        "- Negatives: #{negatives_value}"
+      ].join("\n")
+    }
+  end
+
+  # Pulls labeled section content from common markdown output patterns.
+  def extract_labeled_summary_sections(text)
+    lines = text.to_s.split("\n").map { |line| line.gsub("**", "").strip }
+    sections = { sentiment: nil, positives: nil, negatives: nil }
+
+    lines.each_with_index do |line, index|
+      downcased = line.downcase
+
+      if downcased.start_with?("overall sentiment:")
+        sections[:sentiment] = line.split(":", 2).last.to_s.strip
+      elsif downcased.start_with?("notable positives:") || downcased.start_with?("positives:") || downcased.start_with?("positive highlights:") || downcased.start_with?("highlights:")
+        sections[:positives] = next_nonempty_content_line(lines, index)
+      elsif downcased.start_with?("notable negatives:") || downcased.start_with?("negatives:")
+        sections[:negatives] = next_nonempty_content_line(lines, index)
+      end
+    end
+
+    sections
+  end
+
+  # Finds the first non-empty line after a section heading.
+  def next_nonempty_content_line(lines, heading_index)
+    lines[(heading_index + 1)..].to_a.each do |line|
+      candidate = line.gsub(/\A[\-\*\s]+/, "").strip
+      next if candidate.blank?
+      break if candidate.downcase.start_with?("overall sentiment:", "notable positives:", "notable negatives:", "positives:", "negatives:")
+
+      return candidate
+    end
+
+    nil
+  end
+
   private
+
+  # Extracts Positive/Mixed/Negative from a sentence, defaulting to Mixed.
+  def extract_sentiment_label(sentence)
+    value = sentence.to_s.downcase
+    return "Positive" if value.include?("positive")
+    return "Negative" if value.include?("negative")
+    return "Mixed" if value.include?("mixed")
+
+    "Mixed"
+  end
 
   # Sends prompt payload to Ollama and delegates result handling to parser logic.
   def perform_request(final_prompt:, endpoint:, normalized:)

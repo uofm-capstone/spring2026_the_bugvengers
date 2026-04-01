@@ -40,7 +40,7 @@ The application depends on the docker-compose.yml file to manage services and vo
 
 For detailed setup instructions and troubleshooting tips, refer to [CONTAINER_DEVELOPMENT.md](./CONTAINER_DEVELOPMENT.md).
 
-## ☁️ Google Cloud Deployment
+## Google Cloud Deployment
 
 This application is deployed on **Google Cloud Run** using a fully containerized setup. The deployment architecture includes:
 
@@ -69,7 +69,13 @@ This application is deployed on **Google Cloud Run** using a fully containerized
 - On app startup, Cloud Run probes port `8080` for health checks—this is preconfigured in the Dockerfile and app server.
 ---
 
-For more details on cloud setup and deployment steps, refer to: [DRAFT_GOOGLE_CLOUD_DEPLOYMENT.md](./DRAFT_GOOGLE_CLOUD_DEPLOYMENT.md)
+For more details on cloud setup and deployment steps, refer to: [GOOGLE_CLOUD_DEPLOYMENT.md](./GOOGLE_CLOUD_DEPLOYMENT.md)
+
+## LLM Setup for Client Feedback Sentiments
+
+This project leverages an internally hosted Large Language Model (LLM) to analyze parsed client feedback survey data. This allows for automated sentiment generation, providing valuable insights directly on student status pages. This approach ensures data privacy and keeps all processing within our GCP environment.
+
+For more details on llm setup in the GCP, refer to: [LLM_SETUP_INSTRUCTIONS.md](./LLM_SETUP_INSTRUCTIONS.md)
 
 ## Legacy Manual Setup (Deprecated)
 1. Create a workspace folder to download your application.

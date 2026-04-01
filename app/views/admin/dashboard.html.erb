@@ -9,11 +9,33 @@
   <%= render "shared/stat_card", label: "Semesters", value: @dashboard_stats[:semesters] %>
 </section>
 
+
 <section class="admin-dashboard__table-card">
   <div class="ui-card__body">
-    <h2>User Management</h2>
+  <h2 style="margin-bottom: 10px;">User Management</h2>
+  <%= form_with url: admin_dashboard_path, method: :get, local: true, class: "ui-form" do |f| %>
+    <div style="display: flex; gap: 10px; align-items: center;">
+      <%= f.text_field :search,
+            value: params[:search],
+            placeholder: "Search users by email or name...",
+            class: "ui-input",
+            style: "flex: 1;" %>
+      <%= f.select :role,
+            options_for_select([
+              ["All Roles", ""],
+              ["Admin", "admin"],
+              ["TA", "ta"],
+              ["Student", "student"]
+            ], params[:role]),
+            {},
+            class: "ui-input" %>
+      <%= f.submit "Filter", class: "btn btn-primary" %>
+      <%= link_to "Clear",
+            admin_dashboard_path,
+            class: "btn btn-secondary" %>
+    </div>
+    <% end %>
   </div>
-
   <div class="ui-table-wrap">
     <table class="table ui-table">
       <thead class="text-center">
@@ -21,6 +43,7 @@
           <th>ID</th>
           <th>Email</th>
           <th>Role</th>
+          <th>Last Logged In</th>
           <th>Actions</th>
         </tr>
       </thead>
@@ -30,6 +53,9 @@
             <td><%= user.id %></td>
             <td><%= user.email %></td>
             <td><%= role_badge(user) %></td>
+            <td>
+              <%= user.last_login_at ? user.last_login_at.strftime("%Y-%m-%d %H:%M") : "Never" %>
+            </td>
             <td>
               <div class="admin-dashboard__actions">
                 <% if can? :update, user %>

@@ -19,10 +19,9 @@
           </div>
         <% end %>
 
-        <div class="row">
-          <div class="mt-4 text-center">
-            <h2>Team Status</h2>
-            <div class="alert alert-info border border-info" role="status" id="status-load-panel" style="opacity:1 !important; visibility:visible !important; transition:none !important; background:#e9f7fb; color:#0f2940;">
+        <section class="semesters-status__section mt-4 text-center">
+            <h2 class="semesters-status__title">Team Status</h2>
+            <div class="alert alert-info semesters-status__loading" role="status" id="status-load-panel" style="opacity:1 !important; visibility:visible !important; transition:none !important;">
               <div class="mb-2">Loading status metrics from GitHub. This page is ready while data loads.</div>
               <div class="d-flex align-items-center justify-content-center gap-2">
                 <div class="spinner-border spinner-border-sm text-primary" role="status" aria-hidden="true" id="status-load-spinner"></div>
@@ -30,8 +29,7 @@
               </div>
               <small id="status-load-elapsed" class="d-block mt-2" style="color:#1e3a52;">Elapsed: 0s</small>
             </div>
-          </div>
-        </div>
+        </section>
 
         <%= turbo_frame_tag "semester-status-content",
           data: { status_src: semester_status_content_path(@semester, debug: params[:debug]) } do %>

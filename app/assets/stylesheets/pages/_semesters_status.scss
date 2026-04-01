@@ -3,11 +3,55 @@
   gap: var(--space-3);
 }
 
+.semesters-status__section {
+  border: 1px solid var(--color-gray-200);
+  border-radius: var(--radius-lg);
+  background: linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
+  padding: var(--space-6);
+  box-shadow: var(--shadow-sm);
+}
+
 .semesters-status__item {
   border-radius: var(--radius-lg);
 }
 
 .semesters-status__title {
-  font-size: var(--text-lg);
+  font-size: var(--text-2xl);
+  font-weight: 700;
+  letter-spacing: -0.01em;
   margin-bottom: var(--space-3);
+}
+
+.semesters-status__loading {
+  max-width: 980px;
+  margin: 0 auto;
+  border: 1px solid #9bd9ff;
+  background: #eaf7ff;
+  color: #16324a;
+  border-radius: var(--radius-md);
+}
+
+.semesters-status__content-row {
+  margin-top: var(--space-2);
+}
+
+.semesters-status__content {
+  text-align: center;
+}
+
+.semesters-status__filters {
+  margin-bottom: var(--space-4);
+}
+
+.semesters-status__filter-btn {
+  min-width: 120px;
+  border-radius: var(--radius-md);
+  font-weight: 600;
+}
+
+.team-status-table-wrap {
+  border: 1px solid var(--color-gray-200);
+  border-radius: var(--radius-md);
+  background: #fff;
+  box-shadow: var(--shadow-sm);
 }

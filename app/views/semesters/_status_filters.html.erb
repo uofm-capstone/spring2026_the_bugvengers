@@ -1,12 +1,12 @@
 <!-- Sprint + Team Filters -->
-<div class="text-center mb-3">
-  <button class="btn btn-outline-primary m-1 sprint-toggle active" data-sprint="all">
+<div class="text-center mb-3 semesters-status__filters">
+  <button class="btn btn-outline-primary m-1 sprint-toggle semesters-status__filter-btn active" data-sprint="all">
     All
   </button>
 
   <% sprint_list.each do |sprint| %>
     <button
-      class="btn btn-outline-primary m-1 sprint-toggle"
+      class="btn btn-outline-primary m-1 sprint-toggle semesters-status__filter-btn"
       data-sprint="<%= sprint.parameterize %>">
       <%= sprint %>
     </button>

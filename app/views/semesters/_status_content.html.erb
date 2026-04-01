@@ -1,7 +1,7 @@
 <%= turbo_frame_tag "semester-status-content" do %>
   <div data-status-content-ready="1" class="d-none" aria-hidden="true"></div>
-  <div class="row">
-    <div class="mt-4 text-center">
+  <div class="row semesters-status__content-row">
+    <div class="text-center semesters-status__content">
       <% if team_exist(@teams) %>
 
       <%= render "semesters/status_filters", sprint_list: @sprint_list %>

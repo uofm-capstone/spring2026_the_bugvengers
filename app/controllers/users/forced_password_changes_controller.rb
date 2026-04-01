@@ -17,6 +17,7 @@ class Users::ForcedPasswordChangesController < ApplicationController
       password_confirmation: params[:password_confirmation]
     )
       current_user.update!(temp_password_changed: true, is_active: true)
+      bypass_sign_in(current_user)
       redirect_to root_path, notice: "Password updated. Welcome to TAG!"
     else
       flash.now[:alert] = current_user.errors.full_messages.join(", ")

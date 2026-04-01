@@ -3,6 +3,9 @@ require "digest"
 require "octokit"
 
 class GithubService
+  GITHUB_OPEN_TIMEOUT_SECONDS = ENV.fetch("GITHUB_OPEN_TIMEOUT_SECONDS", 4).to_i
+  GITHUB_READ_TIMEOUT_SECONDS = ENV.fetch("GITHUB_READ_TIMEOUT_SECONDS", 8).to_i
+
   CardInfo = Struct.new(:title, :status, :assignees, :fields, :type, :updated_at)
   CBPResult = Struct.new(:commit_count, :lines_added, :lines_removed, :lines_changed)
   PRResult = Struct.new(:opened_count, :merged_count, :open_count, :avg_merge_hours)
@@ -61,7 +64,15 @@ class GithubService
       return
     end
 
-    @client = Octokit::Client.new(access_token: resolved_token)
+    @client = Octokit::Client.new(
+      access_token: resolved_token,
+      connection_options: {
+        request: {
+          open_timeout: GITHUB_OPEN_TIMEOUT_SECONDS,
+          timeout: GITHUB_READ_TIMEOUT_SECONDS
+        }
+      }
+    )
 
     begin
       @client.user

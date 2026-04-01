@@ -207,6 +207,7 @@
 
       try {
         frame.dataset.fallbackFetchStarted = "1";
+        setStatusDebug("fallback fetch in progress");
         const response = await fetch(src, {
           headers: {
             Accept: "text/html"
@@ -279,7 +280,8 @@
         const busy = frame.hasAttribute("busy") ? "yes" : "no";
         const loaded = frame.dataset.loaded === "1" ? "yes" : "no";
         const hasMarker = hasRenderableStatusContent(frame) ? "yes" : "no";
-        setStatusDebug(`busy=${busy}, loaded=${loaded}, marker=${hasMarker}`);
+        const fallback = frame.dataset.fallbackFetchStarted === "1" ? "yes" : "no";
+        setStatusDebug(`busy=${busy}, fallback=${fallback}, loaded=${loaded}, marker=${hasMarker}`);
       });
 
       observer.observe(frame, { attributes: true, childList: true, subtree: true });

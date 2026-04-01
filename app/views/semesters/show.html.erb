@@ -19,26 +19,30 @@
           </div>
         <% end %>
 
+        <div class="row">
+          <div class="mt-4 text-center">
+            <h2>Team Status</h2>
+            <div class="alert alert-info" role="status" id="status-load-panel">
+              <div class="mb-2">Loading status metrics from GitHub. This page is ready while data loads.</div>
+              <div class="progress" style="height: 0.9rem;">
+                <div
+                  id="status-load-bar"
+                  class="progress-bar progress-bar-striped progress-bar-animated"
+                  role="progressbar"
+                  style="width: 8%;"
+                  aria-valuemin="0"
+                  aria-valuemax="100"
+                  aria-valuenow="8">8%</div>
+              </div>
+              <small id="status-load-text" class="d-block mt-2 text-muted">Fetching Kanban + GitHub data...</small>
+            </div>
+          </div>
+        </div>
+
         <%= turbo_frame_tag "semester-status-content",
           src: semester_status_content_path(@semester, debug: params[:debug]) do %>
-          <div class="row">
-            <div class="mt-4 text-center">
-              <h2>Team Status</h2>
-              <div class="alert alert-info" role="status" id="status-load-panel">
-                <div class="mb-2">Loading status metrics from GitHub. This page is ready while data loads.</div>
-                <div class="progress" style="height: 0.9rem;">
-                  <div
-                    id="status-load-bar"
-                    class="progress-bar progress-bar-striped progress-bar-animated"
-                    role="progressbar"
-                    style="width: 8%;"
-                    aria-valuemin="0"
-                    aria-valuemax="100"
-                    aria-valuenow="8">8%</div>
-                </div>
-                <small id="status-load-text" class="d-block mt-2 text-muted">Fetching Kanban + GitHub data...</small>
-              </div>
-            </div>
+          <div class="text-center text-muted py-3" id="status-frame-placeholder">
+            Preparing status content...
           </div>
         <% end %>
       </div>
@@ -121,6 +125,7 @@
 
     let statusProgressTimer;
     let statusFallbackAttempts = 0;
+    const STATUS_MAX_FALLBACK_ATTEMPTS = 12;
 
     function setStatusProgress(value, label) {
       const bar = document.getElementById("status-load-bar");
@@ -191,7 +196,13 @@
         const parsed = new DOMParser().parseFromString(html, "text/html");
         const returnedFrame = parsed.getElementById("semester-status-content");
 
-        frame.innerHTML = returnedFrame ? returnedFrame.innerHTML : html;
+        // Only inject known status payload shapes to avoid replacing the frame
+        // with unrelated HTML (e.g., redirects or full-page responses).
+        if (returnedFrame) {
+          frame.innerHTML = returnedFrame.innerHTML;
+        } else if (parsed.querySelector(".team-status-table") || parsed.querySelector(".alert-warning")) {
+          frame.innerHTML = html;
+        }
 
         if (hasRenderableStatusContent(frame)) {
           frame.dataset.loaded = "1";
@@ -211,16 +222,18 @@
         const frame = document.getElementById("semester-status-content");
         if (!frame || frame.dataset.loaded === "1") return;
 
-        // Allow Turbo enough time first; then do up to 3 guarded retries.
-        if (!frame.hasAttribute("busy") && statusFallbackAttempts < 3) {
+        // Allow Turbo enough time first; then do guarded retries while waiting.
+        if (!frame.hasAttribute("busy") && statusFallbackAttempts < STATUS_MAX_FALLBACK_ATTEMPTS) {
           statusFallbackAttempts += 1;
           await ensureStatusContentLoaded();
         }
 
-        if (frame.dataset.loaded !== "1" && statusFallbackAttempts < 3) {
+        if (frame.dataset.loaded !== "1" && statusFallbackAttempts < STATUS_MAX_FALLBACK_ATTEMPTS) {
           scheduleStatusFallback();
+        } else if (frame.dataset.loaded !== "1") {
+          setStatusProgress(96, "Still loading metrics. GitHub requests are taking longer than usual.");
         }
-      }, 3500);
+      }, 5000);
     }
 
     document.addEventListener("DOMContentLoaded", initTooltipsAndSprintFilter);

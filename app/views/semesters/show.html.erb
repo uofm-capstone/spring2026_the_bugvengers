@@ -29,7 +29,6 @@
                 <strong id="status-load-text">Fetching Kanban + GitHub data...</strong>
               </div>
               <small id="status-load-elapsed" class="d-block mt-2" style="color:#1e3a52;">Elapsed: 0s</small>
-              <small id="status-load-debug" class="d-block mt-1 text-secondary">Frame state: initializing</small>
             </div>
           </div>
         </div>
@@ -85,48 +84,12 @@
         });
       });
 
-      const teamFilterButtons = document.querySelectorAll('.team-filter');
-      const teamRows = document.querySelectorAll('tr[data-team-filter="1"]');
-      const teamCards = document.querySelectorAll('[data-team-card="1"]');
-
-      function shouldShowForFilter(element, filter) {
-        if (filter === 'all') return true;
-        if (filter === 'at-risk') return element.dataset.atRisk === 'true';
-        if (filter === 'missing-done') return element.dataset.missingDone === 'true';
-        return true;
-      }
-
-      function applyTeamFilter(filter) {
-        teamRows.forEach(row => {
-          row.style.display = shouldShowForFilter(row, filter) ? '' : 'none';
-        });
-
-        teamCards.forEach(card => {
-          card.style.display = shouldShowForFilter(card, filter) ? '' : 'none';
-        });
-      }
-
-      teamFilterButtons.forEach(button => {
-        if (button.dataset.teamFilterBound === '1') return;
-        button.dataset.teamFilterBound = '1';
-
-        button.addEventListener('click', () => {
-          teamFilterButtons.forEach(btn => btn.classList.remove('active'));
-          button.classList.add('active');
-          applyTeamFilter(button.dataset.filter || 'all');
-        });
-      });
     } 
 
     let statusProgressTimer;
     let statusElapsedTimer;
     let statusElapsedSeconds = 0;
     const STATUS_REQUEST_TIMEOUT_MS = 30000;
-
-    function setStatusDebug(message) {
-      const debug = document.getElementById("status-load-debug");
-      if (debug && message) debug.textContent = `Frame state: ${message}`;
-    }
 
     function ensurePanelVisible() {
       const panel = document.getElementById("status-load-panel");
@@ -150,7 +113,6 @@
       let value = 8;
       ensurePanelVisible();
       setStatusProgress(value, "Fetching Kanban + GitHub data...");
-      setStatusDebug("request in progress");
       const spinner = document.getElementById("status-load-spinner");
       if (spinner) spinner.style.display = "inline-block";
 
@@ -188,7 +150,6 @@
       if (spinner) spinner.style.display = "none";
       const elapsed = document.getElementById("status-load-elapsed");
       if (elapsed) elapsed.textContent = `Elapsed: ${statusElapsedSeconds}s`;
-      setStatusDebug("content ready");
 
       if (panel) {
         setTimeout(() => {
@@ -219,8 +180,6 @@
       let timeoutId;
 
       try {
-        setStatusDebug("request in progress");
-
         if (typeof AbortController !== "undefined") {
           controller = new AbortController();
           timeoutId = setTimeout(() => controller.abort(), STATUS_REQUEST_TIMEOUT_MS);
@@ -234,7 +193,6 @@
           signal: controller ? controller.signal : undefined
         });
         if (!response.ok) throw new Error(`HTTP_${response.status}`);
-        setStatusDebug(`response ${response.status}`);
 
         const html = await response.text();
         const parsed = new DOMParser().parseFromString(html, "text/html");
@@ -262,10 +220,8 @@
 
         if (e && e.name === "AbortError") {
           setStatusProgress(95, "Status request timed out. Please refresh to retry.");
-          setStatusDebug("request timed out");
         } else {
           setStatusProgress(95, "Status request failed. Please refresh to retry.");
-          setStatusDebug(`request failed: ${e && e.message ? e.message : "unknown"}`);
         }
 
         clearInterval(statusProgressTimer);
@@ -275,27 +231,10 @@
       }
     }
 
-    function attachFrameDiagnostics() {
-      const frame = document.getElementById("semester-status-content");
-      if (!frame || frame.dataset.diagnosticsBound === "1") return;
-
-      frame.dataset.diagnosticsBound = "1";
-
-      const observer = new MutationObserver(() => {
-        const loaded = frame.dataset.loaded === "1" ? "yes" : "no";
-        const hasMarker = hasRenderableStatusContent(frame) ? "yes" : "no";
-        setStatusDebug(`loaded=${loaded}, marker=${hasMarker}`);
-      });
-
-      observer.observe(frame, { attributes: true, childList: true, subtree: true });
-    }
-
     document.addEventListener("DOMContentLoaded", initTooltipsAndSprintFilter);
     document.addEventListener("turbo:load", initTooltipsAndSprintFilter);
     document.addEventListener("DOMContentLoaded", startStatusProgress);
     document.addEventListener("turbo:load", startStatusProgress);
-    document.addEventListener("DOMContentLoaded", attachFrameDiagnostics);
-    document.addEventListener("turbo:load", attachFrameDiagnostics);
     document.addEventListener("DOMContentLoaded", requestStatusContent);
     document.addEventListener("turbo:load", requestStatusContent);
   </script>

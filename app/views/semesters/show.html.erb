@@ -127,6 +127,7 @@
     let statusProgressTimer;
     let statusFallbackAttempts = 0;
     const STATUS_MAX_FALLBACK_ATTEMPTS = 12;
+    const STATUS_FALLBACK_FETCH_TIMEOUT_MS = 12000;
 
     function setStatusDebug(message) {
       const debug = document.getElementById("status-load-debug");
@@ -205,14 +206,24 @@
       const src = frame.getAttribute("src");
       if (!src) return;
 
+      let controller;
+      let timeoutId;
+
       try {
         frame.dataset.fallbackFetchStarted = "1";
         setStatusDebug("fallback fetch in progress");
+
+        if (typeof AbortController !== "undefined") {
+          controller = new AbortController();
+          timeoutId = setTimeout(() => controller.abort(), STATUS_FALLBACK_FETCH_TIMEOUT_MS);
+        }
+
         const response = await fetch(src, {
           headers: {
             Accept: "text/html"
           },
-          credentials: "same-origin"
+          credentials: "same-origin",
+          signal: controller ? controller.signal : undefined
         });
         if (!response.ok) return;
         setStatusDebug(`fallback response ${response.status}`);
@@ -238,8 +249,14 @@
           setStatusDebug("response parsed, ready marker not found yet");
         }
       } catch (e) {
-        setStatusDebug(`fallback fetch error: ${e && e.name ? e.name : "unknown"}`);
+        if (e && e.name === "AbortError") {
+          setStatusProgress(94, "Still loading metrics... retrying request.");
+          setStatusDebug("fallback fetch timed out; scheduling retry");
+        } else {
+          setStatusDebug(`fallback fetch error: ${e && e.name ? e.name : "unknown"}`);
+        }
       } finally {
+        if (timeoutId) clearTimeout(timeoutId);
         frame.dataset.fallbackFetchStarted = "0";
       }
     }

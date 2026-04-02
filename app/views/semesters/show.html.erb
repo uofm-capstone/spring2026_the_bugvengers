@@ -87,7 +87,7 @@
     let statusProgressTimer;
     let statusElapsedTimer;
     let statusElapsedSeconds = 0;
-    const STATUS_REQUEST_TIMEOUT_MS = 30000;
+    const STATUS_REQUEST_TIMEOUT_MS = 60000;
 
     function ensurePanelVisible() {
       const panel = document.getElementById("status-load-panel");
@@ -163,6 +163,95 @@
       return Boolean(frame.querySelector('[data-status-content-ready="1"]'));
     }
 
+    // Upload sponsor CSV asynchronously so GitHub status data is not reloaded.
+    function initSponsorCsvUpload() {
+      if (document.documentElement.dataset.sponsorUploadBound === "1") return;
+      document.documentElement.dataset.sponsorUploadBound = "1";
+
+      document.addEventListener("submit", async (event) => {
+        const form = event.target;
+        if (!(form instanceof HTMLFormElement)) return;
+        if (form.dataset.sponsorUploadForm !== "1") return;
+
+        event.preventDefault();
+
+        const sprintKey = form.dataset.sponsorSprintKey;
+        const control = sprintKey ? document.querySelector(`[data-sponsor-control="${sprintKey}"]`) : null;
+        const fileInput = form.querySelector('input[name="sponsor_csv"]');
+        const feedbackEl = control ? control.querySelector('[data-sponsor-upload-feedback]') : null;
+        const hintEl = control ? control.querySelector('[data-sponsor-upload-hint]') : null;
+        const actionEl = control ? control.querySelector('[data-sponsor-actions]') : null;
+
+        if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
+          if (feedbackEl) {
+            feedbackEl.textContent = "Please choose a CSV file before uploading.";
+            feedbackEl.className = "small text-danger";
+          }
+          return;
+        }
+
+        const submitBtn = form.querySelector('input[type="submit"], button[type="submit"]');
+        const originalBtnText = submitBtn ? submitBtn.value || submitBtn.textContent : null;
+        if (submitBtn) {
+          submitBtn.disabled = true;
+          if ("value" in submitBtn) {
+            submitBtn.value = "Uploading...";
+          } else {
+            submitBtn.textContent = "Uploading...";
+          }
+        }
+
+        try {
+          const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute("content");
+          const response = await fetch(form.action, {
+            method: "POST",
+            credentials: "same-origin",
+            headers: {
+              Accept: "application/json",
+              "X-CSRF-Token": csrf || ""
+            },
+            body: new FormData(form)
+          });
+
+          const payload = await response.json().catch(() => ({}));
+
+          if (!response.ok || !payload.success) {
+            throw new Error(payload.message || "Sponsor CSV upload failed.");
+          }
+
+          if (hintEl) hintEl.classList.add("d-none");
+          if (actionEl) actionEl.classList.remove("d-none");
+          if (feedbackEl) {
+            feedbackEl.textContent = payload.message || "Sponsor CSV uploaded successfully.";
+            feedbackEl.className = "small text-success";
+          }
+
+          const modalsContainer = document.getElementById("sponsor-modals-container");
+          if (modalsContainer && payload.modals_html) {
+            modalsContainer.innerHTML = payload.modals_html;
+          }
+
+          form.reset();
+        } catch (error) {
+          if (feedbackEl) {
+            feedbackEl.textContent = error.message || "Sponsor CSV upload failed.";
+            feedbackEl.className = "small text-danger";
+          }
+        } finally {
+          if (submitBtn) {
+            submitBtn.disabled = false;
+            if (originalBtnText !== null) {
+              if ("value" in submitBtn) {
+                submitBtn.value = originalBtnText;
+              } else {
+                submitBtn.textContent = originalBtnText;
+              }
+            }
+          }
+        }
+      });
+    }
+
     // Fallback loader: only runs if Turbo frame hydration appears stuck.
     async function requestStatusContent() {
       const frame = document.getElementById("semester-status-content");
@@ -235,4 +324,6 @@
     document.addEventListener("turbo:load", startStatusProgress);
     document.addEventListener("DOMContentLoaded", requestStatusContent);
     document.addEventListener("turbo:load", requestStatusContent);
+    document.addEventListener("DOMContentLoaded", initSponsorCsvUpload);
+    document.addEventListener("turbo:load", initSponsorCsvUpload);
   </script>

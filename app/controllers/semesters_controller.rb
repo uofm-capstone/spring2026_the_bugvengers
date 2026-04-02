@@ -21,9 +21,11 @@ class SemestersController < ApplicationController
   include ClientDisplayHelper
   include ClientSurveyPatternsHelper
 
-  before_action :set_semester, only: [:show, :edit, :update, :destroy]
+  before_action :set_semester, only: [:show, :edit, :update, :destroy, :sponsor_responses, :upload_sponsor_csv, :sponsor_response_details]
   before_action :check_ownership, only: [:destroy]
   before_action :check_admin
+  before_action :check_ta_or_admin, only: [:sponsor_responses, :upload_sponsor_csv, :sponsor_response_details]
+  skip_before_action :check_admin, only: [:sponsor_responses, :upload_sponsor_csv, :sponsor_response_details]
 
   # --------------------------------------------------------
   # SETUP & AUTHORIZATION HELPERS
@@ -45,6 +47,13 @@ class SemestersController < ApplicationController
   def check_admin
     unless current_user.admin?
       redirect_to root_path(flash[:alert] = "You are not authorized to access this page.")
+    end
+  end
+
+  # Allows access for TA and Admin users.
+  def check_ta_or_admin
+    unless current_user&.ta? || current_user&.admin?
+      redirect_to semesters_path, alert: "Access denied."
     end
   end
 
@@ -367,6 +376,83 @@ end
     redirect_to semester_path(@semester)
   end
 
+  # Sponsor response upload + summary UI page.
+  def sponsor_responses
+    @sponsor_csv_attached = @semester.client_csv.attached?
+    @sponsor_rows_count = 0
+    @sponsor_summary_text = "Upload a sponsor CSV to generate a summary. Once backend AI summarization is wired, this popup will show the LLM output."
+
+    return unless @sponsor_csv_attached
+
+    parsed = parse_sponsor_csv
+    @sponsor_rows_count = parsed[:rows].size
+
+    if parsed[:errors].present?
+      @sponsor_summary_text = "Sponsor CSV is attached, but parsing failed. Please verify CSV format and try again."
+      flash.now[:alert] = parsed[:errors].join(" | ")
+      return
+    end
+
+    @sponsor_summary_text = "Placeholder summary: #{@sponsor_rows_count} sponsor responses parsed across teams and sprints. Backend AI summary output will appear here once connected."
+  end
+
+  # Handles sponsor CSV upload from the frontend form.
+  def upload_sponsor_csv
+    sprint_number = params[:sprint_number].to_s.strip
+    sprint_label = "Sprint #{sprint_number}"
+    sprint_key = "sprint-#{sprint_number}"
+    attachment_name = sponsor_attachment_name_for_sprint(sprint_number)
+    success = false
+    message = nil
+
+    if attachment_name.nil?
+      message = "Invalid sprint for sponsor CSV upload."
+    elsif params[:sponsor_csv].present?
+      attachment = @semester.public_send(attachment_name)
+      attachment.attach(params[:sponsor_csv])
+      success = attachment.attached?
+      message = success ? "#{sprint_label} sponsor CSV uploaded successfully." : "#{sprint_label} sponsor CSV upload failed."
+    else
+      message = "Please choose a CSV file before uploading."
+    end
+
+    build_sponsor_ui_payload!
+
+    respond_to do |format|
+      format.json do
+        modals_html = render_to_string(partial: "semesters/sponsor_response_modals", formats: [:html])
+        render json: {
+          success: success,
+          message: message,
+          modals_html: modals_html,
+          sponsor_csv_attached: @sponsor_csv_attached,
+          sprint_key: sprint_key
+        }, status: (success ? :ok : :unprocessable_entity)
+      end
+
+      format.html do
+        flash[success ? :notice : :alert] = message
+        redirect_to semester_path(@semester)
+      end
+    end
+  end
+
+  # Dedicated sponsor detail page with question/answer rows.
+  def sponsor_response_details
+    @sponsor_csv_attached = @semester.client_csv.attached?
+    @sponsor_details = []
+
+    return unless @sponsor_csv_attached
+
+    parsed = parse_sponsor_csv
+    if parsed[:errors].present?
+      flash.now[:alert] = parsed[:errors].join(" | ")
+      return
+    end
+
+    @sponsor_details = build_sponsor_details(parsed: parsed)
+  end
+
   # --------------------------------------------------------
   # HELPER / UTILITY METHODS
   # --------------------------------------------------------
@@ -444,6 +530,49 @@ end
   # --------------------------------------------------------
 
   private
+
+  def parse_sponsor_csv(attachment: nil)
+    target_attachment = attachment || @semester.client_csv
+    return { rows: [], full_questions: {}, errors: ["No sponsor CSV attached."] } unless target_attachment&.attached?
+
+    target_attachment.open do |temp_client|
+      CSVSurveyParserService.new(file: temp_client).parse
+    end
+  rescue StandardError => e
+    Rails.logger.error("Sponsor CSV parse failed for semester #{@semester.id}: #{e.class} - #{e.message}")
+    { rows: [], full_questions: {}, errors: ["Unable to parse sponsor CSV."] }
+  end
+
+  def sponsor_attachment_name_for_sprint(sprint_number)
+    case sprint_number.to_s
+    when "2"
+      :sponsor_csv_sprint_2
+    when "3"
+      :sponsor_csv_sprint_3
+    when "4"
+      :sponsor_csv_sprint_4
+    end
+  end
+
+  def build_sponsor_details(parsed:)
+    rows = parsed[:rows] || []
+    full_questions = parsed[:full_questions] || {}
+    detail_keys = rows.first&.keys&.select { |key| key.to_s.match?(/\Aq2_\d+\z/i) || %w[q4 q5 q6 q7].include?(key.to_s.downcase) } || []
+
+    rows.map do |row|
+      responses = detail_keys.map do |key|
+        question = full_questions[key.to_s].presence || key.to_s.upcase
+        answer = row[key].to_s.strip
+        { question: question, answer: answer.presence || "Not answered" }
+      end
+
+      {
+        team: row[:q1_team].presence || "Unknown Team",
+        sprint: row[:q3].presence || "Unknown Sprint",
+        responses: responses
+      }
+    end
+  end
 
   def build_status_payload!
     @teams = @semester.teams
@@ -556,6 +685,74 @@ end
     end
 
     @team_overview_by_id = @team_status_overview.index_by { |summary| summary[:team_id] }
+    build_sponsor_ui_payload!
+    build_sponsor_scores_by_team!
+  end
+
+  def build_sponsor_scores_by_team!
+    sprint_sources = {
+      "Sprint 2" => @semester.sponsor_csv_sprint_2,
+      "Sprint 3" => @semester.sponsor_csv_sprint_3,
+      "Sprint 4" => @semester.sponsor_csv_sprint_4
+    }
+
+    @sponsor_scores_by_team = @teams.each_with_object({}) do |team, acc|
+      acc[team.name] = {
+        "Sprint 2" => nil,
+        "Sprint 3" => nil,
+        "Sprint 4" => nil
+      }
+    end
+
+    sprint_sources.each do |sprint_label, attachment|
+      next unless attachment.attached?
+
+      parsed = parse_sponsor_csv(attachment: attachment)
+      rows = parsed[:rows] || []
+      next if parsed[:errors].present? || rows.blank?
+
+      performance_columns = rows.first.keys.select { |header| header.to_s.match?(PERFORMANCE_PATTERN) }
+
+      @teams.each do |team|
+        matching_rows = best_matching_team_rows(client_rows: rows, team: team.name, sprint: sprint_label)
+        next if matching_rows.blank? || performance_columns.blank?
+
+        @sponsor_scores_by_team[team.name][sprint_label] = calculate_score(matching_rows.first, performance_columns)
+      end
+    end
+  end
+
+  def build_sponsor_ui_payload!
+    sponsor_sources = {
+      "Sprint 2" => @semester.sponsor_csv_sprint_2,
+      "Sprint 3" => @semester.sponsor_csv_sprint_3,
+      "Sprint 4" => @semester.sponsor_csv_sprint_4
+    }
+
+    @sponsor_csv_attached = {}
+    @sponsor_rows_count = {}
+    @sponsor_summary_text = {}
+    @sponsor_details = {}
+
+    sponsor_sources.each do |sprint_label, attachment|
+      @sponsor_csv_attached[sprint_label] = attachment.attached?
+      @sponsor_rows_count[sprint_label] = 0
+      @sponsor_summary_text[sprint_label] = "Upload a sponsor CSV for #{sprint_label} to view summary and detailed questions."
+      @sponsor_details[sprint_label] = []
+
+      next unless attachment.attached?
+
+      parsed = parse_sponsor_csv(attachment: attachment)
+      @sponsor_rows_count[sprint_label] = parsed[:rows].size
+
+      if parsed[:errors].present?
+        @sponsor_summary_text[sprint_label] = "#{sprint_label} sponsor CSV is attached, but parsing failed. Please verify CSV format and try again."
+        next
+      end
+
+      @sponsor_summary_text[sprint_label] = "Placeholder summary for #{sprint_label}: #{@sponsor_rows_count[sprint_label]} sponsor responses parsed. Backend AI summary output will appear here once connected."
+      @sponsor_details[sprint_label] = build_sponsor_details(parsed: parsed)
+    end
   end
 
   def safe_board_health(team_service:, team:)

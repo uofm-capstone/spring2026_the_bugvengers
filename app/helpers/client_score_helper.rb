@@ -22,11 +22,27 @@ module ClientScoreHelper
         performance_average.round(1)
       end
 
+      def sponsor_attachment_for_sprint(semester, sprint)
+        case sprint.to_s.strip.downcase
+        when "sprint 2"
+          semester.sponsor_csv_sprint_2
+        when "sprint 3"
+          semester.sponsor_csv_sprint_3
+        when "sprint 4"
+          semester.sponsor_csv_sprint_4
+        else
+          semester.client_csv
+        end
+      end
+
       def get_client_score(semester, team, sprint)
         # Restricts fuzzy team matching to reasonably close strings only.
         similarity_threshold = 0.1  # Adjust this for team matching as needed
 
-        semester.client_csv.open do |tempfile|
+        attachment = sponsor_attachment_for_sprint(semester, sprint)
+        return "No Score" unless attachment&.attached?
+
+        attachment.open do |tempfile|
           begin
             # Reuse centralized parsing rules (Qualtrics rows, metadata skipping, normalization).
             parsed = CSVSurveyParserService.new(file: tempfile).parse

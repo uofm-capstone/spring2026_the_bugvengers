@@ -16,6 +16,9 @@
         semester: @semester,
         team_sprint_metrics: @team_sprint_metrics,
         status_metrics: @status_metrics %>
+      <div id="sponsor-modals-container">
+        <%= render "semesters/sponsor_response_modals" %>
+      </div>
 
       <% else %>
         <h2>Team Status</h2>

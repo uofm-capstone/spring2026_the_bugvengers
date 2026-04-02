@@ -1,0 +1,81 @@
+<% sponsor_columns = [
+  { sprint: "Sprint 2", css: "sprint-2" },
+  { sprint: "Sprint 3", css: "sprint-3" },
+  { sprint: "Sprint 4", css: "sprint-4" }
+] %>
+
+<% sponsor_columns.each do |sponsor_column| %>
+  <% sprint_label = sponsor_column[:sprint] %>
+  <% sprint_key = sponsor_column[:css] %>
+  <% attached = @sponsor_csv_attached[sprint_label] %>
+  <% next unless attached %>
+
+  <div class="modal fade" id="sponsorSummaryModal-<%= sprint_key %>" tabindex="-1" aria-labelledby="sponsorSummaryModalLabel-<%= sprint_key %>" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="sponsorSummaryModalLabel-<%= sprint_key %>"><%= sprint_label %> Summary</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <p class="mb-2"><%= @sponsor_summary_text[sprint_label] %></p>
+          <p class="mb-0 text-muted small">Parsed responses: <%= @sponsor_rows_count[sprint_label] %></p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal fade" id="sponsorQuestionsModal-<%= sprint_key %>" tabindex="-1" aria-labelledby="sponsorQuestionsModalLabel-<%= sprint_key %>" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="sponsorQuestionsModalLabel-<%= sprint_key %>"><%= sprint_label %> Questions and Answers</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <% details = @sponsor_details[sprint_label] || [] %>
+          <% if details.blank? %>
+            <div class="alert alert-info mb-0" role="alert">
+              No sponsor question rows are available to display.
+            </div>
+          <% else %>
+            <% details.each_with_index do |entry, index| %>
+              <article class="ui-card mb-3">
+                <div class="ui-card__body">
+                  <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h6 class="mb-0">Response <%= index + 1 %></h6>
+                    <small class="text-muted"><strong>Team:</strong> <%= entry[:team] %> | <strong>Sprint:</strong> <%= entry[:sprint] %></small>
+                  </div>
+                  <div class="table-responsive">
+                    <table class="table table-bordered align-middle mb-0">
+                      <thead>
+                        <tr>
+                          <th style="width: 45%;">Question</th>
+                          <th>Answer</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <% entry[:responses].each do |response| %>
+                          <tr>
+                            <td><%= response[:question] %></td>
+                            <td><%= response[:answer] %></td>
+                          </tr>
+                        <% end %>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </article>
+            <% end %>
+          <% end %>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+<% end %>

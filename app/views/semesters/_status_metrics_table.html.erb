@@ -1,5 +1,11 @@
 <!-- TABLE -->
 <div class="table-responsive team-status-table-wrap">
+  <% rubric_items = ["FS&D", "FA", "TE", "TT", "KU", "PP"] %>
+  <% sponsor_columns = [
+    { sprint: "Sprint 2", label: "Sponsor Response - Sprint 2", css: "sprint-2" },
+    { sprint: "Sprint 3", label: "Sponsor Response - Sprint 3", css: "sprint-3" },
+    { sprint: "Sprint 4", label: "Sponsor Response - Sprint 4", css: "sprint-4" }
+  ] %>
   <table class="table table-bordered align-middle text-center team-status-table">
     <thead>
       <tr>
@@ -8,10 +14,12 @@
         <% sprint_list.each do |sprint| %>
           <th colspan="6" class="sprint-group <%= sprint.parameterize %>"><%= sprint %></th>
         <% end %>
+        <% sponsor_columns.each do |sponsor_column| %>
+          <th class="sprint-group <%= sponsor_column[:css] %>" rowspan="2"><%= sponsor_column[:label] %></th>
+        <% end %>
       </tr>
 
       <tr>
-        <% rubric_items = ["FS&D", "FA", "TE", "TT", "KU", "PP"] %>
         <% sprint_list.each do |sprint| %>
           <% rubric_items.each do |item| %>
             <% tooltip = case item
@@ -39,6 +47,8 @@
     </thead>
 
     <tbody>
+      <% sponsor_controls_row_rendered = false %>
+      <% sponsor_controls_rowspan = teams.sum { |team| team.students.size + 1 } %>
       <% teams.each do |team| %>
         <% team_summary = team_overview_by_id[team.id] || {} %>
         <% team.students.each_with_index do |student, i| %>
@@ -111,6 +121,39 @@
                 </td>
               <% end %>
             <% end %>
+
+            <% sponsor_columns.each do |sponsor_column| %>
+              <% if !sponsor_controls_row_rendered %>
+                <td rowspan="<%= sponsor_controls_rowspan %>" class="text-center align-middle sprint-group <%= sponsor_column[:css] %>">
+                  <% sprint_label = sponsor_column[:sprint] %>
+                  <% sprint_number = sprint_label.split.last %>
+                  <% sprint_key = sponsor_column[:css] %>
+                  <% attached = @sponsor_csv_attached[sprint_label] %>
+                  <div class="d-flex flex-column gap-2 align-items-center" data-sponsor-control="<%= sprint_key %>">
+                    <span>Sponsor Review</span>
+                    <%= form_with url: upload_sponsor_csv_semester_path(semester), method: :post, local: true, html: { multipart: true, class: "d-flex gap-1 flex-wrap justify-content-center", data: { sponsor_upload_form: "1", sponsor_sprint_key: sprint_key } } do %>
+                      <%= hidden_field_tag :sprint_number, sprint_number %>
+                      <%= file_field_tag :sponsor_csv, accept: ".csv", class: "form-control form-control-sm" %>
+                      <%= submit_tag "Upload", class: "btn btn-ui-primary btn-sm" %>
+                    <% end %>
+
+                    <div class="d-flex gap-2 <%= attached ? '' : 'd-none' %>" data-sponsor-actions>
+                      <button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#sponsorSummaryModal-<%= sprint_key %>">
+                        Summary
+                      </button>
+                      <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#sponsorQuestionsModal-<%= sprint_key %>">
+                        Questions
+                      </button>
+                    </div>
+
+                    <span class="text-muted small <%= attached ? 'd-none' : '' %>" data-sponsor-upload-hint>Upload CSV first</span>
+                    <span class="small" data-sponsor-upload-feedback></span>
+                  </div>
+                </td>
+              <% end %>
+            <% end %>
+
+            <% sponsor_controls_row_rendered = true unless sponsor_controls_row_rendered %>
           </tr>
         <% end %>
 
@@ -163,6 +206,7 @@
               </td>
             <% end %>
           <% end %>
+
         </tr>
       <% end %>
     </tbody>

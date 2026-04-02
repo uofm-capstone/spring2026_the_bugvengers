@@ -8,6 +8,9 @@ class Semester < ApplicationRecord
   has_one_attached :student_csv
   has_one_attached :git_csv
   has_one_attached :client_csv
+  has_one_attached :sponsor_csv_sprint_2
+  has_one_attached :sponsor_csv_sprint_3
+  has_one_attached :sponsor_csv_sprint_4
 
   belongs_to :user
   has_many :sprints, inverse_of: :semester, dependent: :destroy

@@ -245,6 +245,7 @@ GEM
     rexml (3.2.6)
     ruby-graphviz (1.2.5)
       rexml
+    ruby_http_client (3.6.0)
     rubyzip (2.3.2)
     sassc (2.4.0)
       ffi (~> 1.9)
@@ -261,6 +262,8 @@ GEM
       rexml (~> 3.2, >= 3.2.5)
       rubyzip (>= 1.2.2, < 3.0)
       websocket (~> 1.0)
+    sendgrid-ruby (6.7.0)
+      ruby_http_client (~> 3.4)
     smarter_csv (1.10.3)
     sprockets (4.2.1)
       concurrent-ruby (~> 1.0)
@@ -335,6 +338,7 @@ DEPENDENCIES
   rails (~> 7.0.4, >= 7.0.4.2)
   rails-erd
   selenium-webdriver
+  sendgrid-ruby
   smarter_csv
   sprockets-rails
   stimulus-rails

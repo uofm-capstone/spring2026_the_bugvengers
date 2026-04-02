@@ -1,5 +1,6 @@
 class ApplicationController < ActionController::Base
   before_action :authenticate_user!
+  before_action :check_temp_password
   before_action :set_semesters
 
   # Catch all CanCanCan AccessDenied errors
@@ -18,5 +19,14 @@ class ApplicationController < ActionController::Base
 
   def set_semesters
     @semesters = Semester.all
+  end
+
+  def check_temp_password
+    return unless user_signed_in?
+    return if current_user.temp_password_changed?
+    return if controller_name == 'forced_password_changes'
+
+    redirect_to forced_password_change_path,
+      alert: "You must set a new password before continuing."
   end
 end

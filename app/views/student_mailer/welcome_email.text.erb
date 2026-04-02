@@ -1,0 +1,10 @@
+Welcome to TAG!
+
+Hello <%= @user.student&.full_name || @user.email %>,
+
+Your account has been created. Use the details below to log in for the first time.
+
+Email: <%= @user.email %>
+Temporary password: <%= @temp_password %>
+
+Log in here: <%= @login_url %>

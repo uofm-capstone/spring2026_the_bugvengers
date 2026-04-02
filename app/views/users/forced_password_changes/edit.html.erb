@@ -1,0 +1,32 @@
+<%= render "shared/page_header",
+  title: "Change Password",
+  subtitle: "Please enter your new password." %>
+
+<section class="auth-edit">
+  <article class="ui-card auth-edit__card">
+    <div class="ui-card__body">
+      <% if flash[:alert] %>
+        <div class="alert alert-danger"><%= flash[:alert] %></div>
+      <% end %>
+
+      <%= form_with url: users_forced_password_change_path, method: :patch, class: "auth-edit__form" do |f| %>
+        <div class="auth-edit__section">
+          <% if @minimum_password_length %>
+            <p class="auth-edit__pending"><%= @minimum_password_length %> characters minimum</p>
+          <% end %>
+          <%= f.label :password, "New Password" %>
+          <%= f.password_field :password, autofocus: true, autocomplete: "new-password", class: "form-control" %>
+        </div>
+
+        <div class="auth-edit__section">
+          <%= f.label :password_confirmation, "Confirm Password" %>
+          <%= f.password_field :password_confirmation, autocomplete: "new-password", class: "form-control" %>
+        </div>
+
+        <div class="auth-edit__actions">
+          <%= f.submit "Confirm", class: "btn btn-ui-primary" %>
+        </div>
+      <% end %>
+    </div>
+  </article>
+</section>

@@ -1,0 +1,214 @@
+<!-- TABLE -->
+<div class="table-responsive team-status-table-wrap">
+  <% rubric_items = ["FS&D", "FA", "TE", "TT", "KU", "PP"] %>
+  <% sponsor_columns = [
+    { sprint: "Sprint 2", label: "Sponsor Response - Sprint 2", css: "sprint-2" },
+    { sprint: "Sprint 3", label: "Sponsor Response - Sprint 3", css: "sprint-3" },
+    { sprint: "Sprint 4", label: "Sponsor Response - Sprint 4", css: "sprint-4" }
+  ] %>
+  <table class="table table-bordered align-middle text-center team-status-table">
+    <thead>
+      <tr>
+        <th class="sticky-col-1" rowspan="2">Team Name</th>
+        <th class="sticky-col-2" rowspan="2">Member</th>
+        <% sprint_list.each do |sprint| %>
+          <th colspan="6" class="sprint-group <%= sprint.parameterize %>"><%= sprint %></th>
+        <% end %>
+        <% sponsor_columns.each do |sponsor_column| %>
+          <th class="sprint-group <%= sponsor_column[:css] %>" rowspan="2"><%= sponsor_column[:label] %></th>
+        <% end %>
+      </tr>
+
+      <tr>
+        <% sprint_list.each do |sprint| %>
+          <% rubric_items.each do |item| %>
+            <% tooltip = case item
+              when "FS&D" then "<strong>Feature Selection and Decomposition</strong><br><b>Metric:</b> Student cards per status in this sprint (Backlog, Todo, In Progress, Done)."
+              when "FA"   then "<strong>Feature Assignments</strong><br><b>Metric:</b> Number of cards assigned to this student in this sprint."
+              when "TE"   then "<strong>Time Estimate</strong><br><b>Metric:</b> Estimated hours for this student's sprint cards."
+              when "TT"   then "<strong>Time Taken</strong><br><b>Metric:</b> Logged hours from Kanban Time Taken / Time Spent fields for this student's sprint cards."
+              when "KU"   then "<strong>Kanban Updates (KU)</strong><br><b>What it measures:</b> How well completed work is documented on the Kanban board.<br><b>Formula (0-100):</b><br>KU = 20 base + 40% TE completeness + 40% TT completeness<br><b>Base 20:</b> Team has at least 1 done card (student row: student has at least 1 assigned card).<br><b>TE completeness:</b> % of done cards with Time Estimate > 0.<br><b>TT completeness:</b> % of done cards with Time Taken/Spent > 0.<br><b>Done cards include:</b> Done, Archived, and Done in Sprint X.<br><b>Bands:</b> Healthy >= 85, Watch >= 70, At Risk < 70."
+              when "PP"   then "<strong>Product Progress</strong><br><b>Metric:</b> Done ratio for sprint cards in scope, with completion band."
+              else "<strong>Metric</strong><br><b>Metric:</b> Description unavailable."
+            end %>
+
+            <th
+              class="sprint-group <%= sprint.parameterize %>"
+              data-bs-toggle="tooltip"
+              data-bs-html="true"
+              data-bs-placement="top"
+              title="<%= tooltip.html_safe %>"
+              style="font-size: 0.75rem;">
+              <%= item %>
+            </th>
+          <% end %>
+        <% end %>
+      </tr>
+    </thead>
+
+    <tbody>
+      <% sponsor_controls_row_rendered = false %>
+      <% sponsor_controls_rowspan = teams.sum { |team| team.students.size + 1 } %>
+      <% teams.each do |team| %>
+        <% team_summary = team_overview_by_id[team.id] || {} %>
+        <% team.students.each_with_index do |student, i| %>
+          <% student_metric_by_sprint = status_metrics.dig(team.id, student.id) || {} %>
+          <tr
+            data-team-filter="1"
+            data-team-id="<%= team.id %>"
+            data-at-risk="<%= team_summary[:any_at_risk] %>"
+            data-missing-done="<%= team_summary[:any_missing_sprint_done] %>">
+            <% if i == 0 %>
+              <td class="sticky-col-1" rowspan="<%= team.students.size + 1 %>">
+                <div class="sticky-cell">
+                  <%= link_to team.name, teams_path(semester), class: "text-decoration-none fw-semibold" %>
+                  <% if team_summary[:any_at_risk] %>
+                    <span class="team-risk-badge">At Risk</span>
+                  <% end %>
+                </div>
+              </td>
+            <% end %>
+
+            <td class="sticky-col-2">
+              <div class="sticky-cell">
+                <%= "#{student.name.split.first} #{student.name.split.last&.first}." %>
+              </div>
+            </td>
+
+            <% sprint_list.each do |sprint| %>
+              <% rubric_items.each do |item| %>
+                <% metric = student_metric_by_sprint[sprint] || {} %>
+                <td class="text-center sprint-group <%= sprint.parameterize %>">
+                  <% case item %>
+                    <% when "FS&D" %>
+                      <% fsd = metric[:fsd] || {} %>
+                      <%= "#{fsd[:backlog] || 0}, #{fsd[:todo] || 0}, #{fsd[:in_progress] || 0}, #{fsd[:done] || 0}" %>
+                    <% when "FA" %>
+                      <%= metric.dig(:fa, :assigned_cards) || 0 %>
+                    <% when "TE" %>
+                      <%= metric.dig(:te, :estimated_hours) || 0 %>
+                    <% when "TT" %>
+                      <%= metric.dig(:ts, :time_spent_hours) || 0 %>
+                    <% when "KU" %>
+                      <% ku_metric = metric[:ku] || {} %>
+                      <% github_metric = metric[:github] || {} %>
+                      <div class="github-score-cell">
+                        <% if ku_metric[:band] != "No Data" %>
+                          <span class="github-score-badge <%= github_score_state_class(ku_metric[:score]) %>">
+                            <%= ku_metric[:score] || 0 %>%
+                          </span>
+                          <span class="github-band"><%= ku_metric[:band] || "No Data" %></span>
+                        <% else %>
+                          <span class="github-score-badge is-watch">N/A</span>
+                          <span class="github-band">No Data</span>
+                        <% end %>
+                        <div class="github-score-chips">
+                          <span class="github-chip" data-bs-toggle="tooltip" data-bs-placement="top" title="<%= github_chip_tooltip('GH') %>">GH <%= compact_score(github_metric[:score]) %></span>
+                          <span class="github-chip" data-bs-toggle="tooltip" data-bs-placement="top" title="<%= github_chip_tooltip('CBP') %>">CBP <%= compact_score(github_metric[:cbp_score]) %></span>
+                          <span class="github-chip" data-bs-toggle="tooltip" data-bs-placement="top" title="<%= github_chip_tooltip('PR') %>">PR <%= compact_score(github_metric[:pr_score]) %></span>
+                          <span class="github-chip" data-bs-toggle="tooltip" data-bs-placement="top" title="<%= github_chip_tooltip('RVW') %>">RVW <%= compact_score(github_metric[:review_score]) %></span>
+                        </div>
+                      </div>
+                    <% when "PP" %>
+                      <% done_count = metric.dig(:fsd, :done).to_i %>
+                      <% total_count = metric.dig(:fa, :assigned_cards).to_i %>
+                      <%= (metric.dig(:pp, :completion_pct) || 0) %>% (<%= metric.dig(:pp, :band) || "No Data" %>)
+                      <div class="github-band"><%= done_count %>/<%= total_count %> done</div>
+
+                    <% else %>
+                      <span>-</span>
+                  <% end %>
+                </td>
+              <% end %>
+            <% end %>
+
+            <% sponsor_columns.each do |sponsor_column| %>
+              <% if !sponsor_controls_row_rendered %>
+                <td rowspan="<%= sponsor_controls_rowspan %>" class="text-center align-middle sprint-group <%= sponsor_column[:css] %>">
+                  <% sprint_label = sponsor_column[:sprint] %>
+                  <% sprint_number = sprint_label.split.last %>
+                  <% sprint_key = sponsor_column[:css] %>
+                  <% attached = @sponsor_csv_attached[sprint_label] %>
+                  <div class="d-flex flex-column gap-2 align-items-center" data-sponsor-control="<%= sprint_key %>">
+                    <span>Sponsor Review</span>
+                    <%= form_with url: upload_sponsor_csv_semester_path(semester), method: :post, local: true, html: { multipart: true, class: "d-flex gap-1 flex-wrap justify-content-center", data: { sponsor_upload_form: "1", sponsor_sprint_key: sprint_key } } do %>
+                      <%= hidden_field_tag :sprint_number, sprint_number %>
+                      <%= file_field_tag :sponsor_csv, accept: ".csv", class: "form-control form-control-sm" %>
+                      <%= submit_tag "Upload", class: "btn btn-ui-primary btn-sm" %>
+                    <% end %>
+
+                    <div class="d-flex gap-2 <%= attached ? '' : 'd-none' %>" data-sponsor-actions>
+                      <button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#sponsorSummaryModal-<%= sprint_key %>">
+                        Summary
+                      </button>
+                      <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#sponsorQuestionsModal-<%= sprint_key %>">
+                        Questions
+                      </button>
+                    </div>
+
+                    <span class="text-muted small <%= attached ? 'd-none' : '' %>" data-sponsor-upload-hint>Upload CSV first</span>
+                    <span class="small" data-sponsor-upload-feedback></span>
+                  </div>
+                </td>
+              <% end %>
+            <% end %>
+
+            <% sponsor_controls_row_rendered = true unless sponsor_controls_row_rendered %>
+          </tr>
+        <% end %>
+
+        <tr
+          class="team-total-row"
+          data-team-filter="1"
+          data-team-id="<%= team.id %>"
+          data-at-risk="<%= team_summary[:any_at_risk] %>"
+          data-missing-done="<%= team_summary[:any_missing_sprint_done] %>">
+          <td class="sticky-col-2"><strong>Total</strong></td>
+
+          <% sprint_list.each do |sprint| %>
+            <% rubric_items.each do |item| %>
+              <% team_metric = team_sprint_metrics.dig(team.id, sprint) || {} %>
+              <td class="text-center sprint-group <%= sprint.parameterize %>">
+                <% case item %>
+                  <% when "FS&D" %>
+                    <strong><%= "#{team_metric[:backlog_cards] || 0}, #{team_metric[:todo_cards] || 0}, #{team_metric[:in_progress_cards] || 0}, #{team_metric[:done_cards] || 0}" %></strong>
+                  <% when "FA" %>
+                    <strong><%= team.students.sum { |s| status_metrics.dig(team.id, s.id, sprint, :fa, :assigned_cards).to_i } %></strong>
+                  <% when "TE" %>
+                    <strong><%= team_metric[:estimated_hours] || 0 %></strong>
+                  <% when "TT" %>
+                    <strong><%= team_metric[:time_spent_hours] || 0 %></strong>
+                  <% when "KU" %>
+                    <% github_metric = team_metric[:github] || {} %>
+                    <div class="github-score-cell">
+                      <% if team_metric[:ku_band] != "No Data" %>
+                        <strong class="github-score-badge <%= github_score_state_class(team_metric[:ku_score]) %>">
+                          <%= team_metric[:ku_score] || 0 %>%
+                        </strong>
+                        <span class="github-band"><%= team_metric[:ku_band] || "No Data" %></span>
+                      <% else %>
+                        <strong class="github-score-badge is-watch">N/A</strong>
+                        <span class="github-band">No Data</span>
+                      <% end %>
+                      <div class="github-score-chips">
+                        <span class="github-chip" data-bs-toggle="tooltip" data-bs-placement="top" title="<%= github_chip_tooltip('GH') %>">GH <%= compact_score(github_metric[:score]) %></span>
+                        <span class="github-chip" data-bs-toggle="tooltip" data-bs-placement="top" title="<%= github_chip_tooltip('CBP') %>">CBP <%= compact_score(github_metric[:cbp_score]) %></span>
+                        <span class="github-chip" data-bs-toggle="tooltip" data-bs-placement="top" title="<%= github_chip_tooltip('PR') %>">PR <%= compact_score(github_metric[:pr_score]) %></span>
+                        <span class="github-chip" data-bs-toggle="tooltip" data-bs-placement="top" title="<%= github_chip_tooltip('RVW') %>">RVW <%= compact_score(github_metric[:review_score]) %></span>
+                      </div>
+                    </div>
+                  <% when "PP" %>
+                    <strong><%= team_metric[:pp_completion_pct] || 0 %>% (<%= team_metric[:pp_band] || "No Data" %>)</strong>
+                    <div class="github-band"><%= team_metric[:done_cards].to_i %>/<%= team_metric[:total_cards].to_i %> done</div>
+                  <% else %>
+                    <span>-</span>
+                <% end %>
+              </td>
+            <% end %>
+          <% end %>
+
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+</div>

@@ -5,15 +5,15 @@
 
 * Team Contract: https://livememphis-my.sharepoint.com/:w:/g/personal/jlin8_memphis_edu/IQB3sMx-HenTSaUsp8y8DGxxAUND235XW6lOD3ulTUL1psY?e=QdDQ4u
 
-* Client Meeting Notes: [https://docs.google.com/document/d/1zPfrdiE6hBqIzEtFx1Fwb6oAbib8PR-Zi7qnjcjqyOU/edit?usp=sharing](https://docs.google.com/document/d/1MBrhAsigjD1iNziOoJ8XKvB69SAu503-9WEMtYMG5Go/edit?usp=sharing)
+* Client Meeting Notes: https://docs.google.com/document/d/1MBrhAsigjD1iNziOoJ8XKvB69SAu503-9WEMtYMG5Go/edit?usp=sharing 
 
-* Demo Day PPT: [https://docs.google.com/presentation/d/1palUE6707hiFTgBdnDsijx6uQr8DtyTXJct2VwM_5dw/edit?usp=sharing](https://docs.google.com/presentation/d/1uWruttHza4RXFavCqQk-JCmfDzW75qkxiA3zujormjY/edit?usp=sharing)
+* Demo Day PPT: [https://docs.google.com/presentation/d/1Gnah-IXV4ybTxAyrbFVIyZ75tz5Z7EQ-3fq6GxYqwBk/edit?usp=sharing]
+  
 # Tool-Assisted Grading (TAG)
 TAG is a web-based application designed to assist professors and teaching assistants in evaluating and grading students. With this application, you can manage grading student an client survey survey's served by Qualtrics (and more features to come).
 
 # Google Cloud Link
-https://fall2025-checkmate-1021386482677.us-south1.run.app/semesters
-
+https://tag-app-service-1081269285897.us-central1.run.app/
 This application is built on Ruby on Rails web framework.
 
 ## Prerequisites
@@ -40,7 +40,7 @@ The application depends on the docker-compose.yml file to manage services and vo
 
 For detailed setup instructions and troubleshooting tips, refer to [CONTAINER_DEVELOPMENT.md](./CONTAINER_DEVELOPMENT.md).
 
-## ☁️ Google Cloud Deployment
+## Google Cloud Deployment
 
 This application is deployed on **Google Cloud Run** using a fully containerized setup. The deployment architecture includes:
 
@@ -69,7 +69,13 @@ This application is deployed on **Google Cloud Run** using a fully containerized
 - On app startup, Cloud Run probes port `8080` for health checks—this is preconfigured in the Dockerfile and app server.
 ---
 
-For more details on cloud setup and deployment steps, refer to: [DRAFT_GOOGLE_CLOUD_DEPLOYMENT.md](./DRAFT_GOOGLE_CLOUD_DEPLOYMENT.md)
+For more details on cloud setup and deployment steps, refer to: [GOOGLE_CLOUD_DEPLOYMENT.md](./GOOGLE_CLOUD_DEPLOYMENT.md)
+
+## LLM Setup for Client Feedback Sentiments
+
+This project leverages an internally hosted Large Language Model (LLM) to analyze parsed client feedback survey data. This allows for automated sentiment generation, providing valuable insights directly on student status pages. This approach ensures data privacy and keeps all processing within our GCP environment.
+
+For more details on llm setup in the GCP, refer to: [LLM_SETUP_INSTRUCTIONS.md](./LLM_SETUP_INSTRUCTIONS.md)
 
 ## Legacy Manual Setup (Deprecated)
 1. Create a workspace folder to download your application.

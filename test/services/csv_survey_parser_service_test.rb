@@ -1,0 +1,83 @@
+require "test_helper"
+
+class CSVSurveyParserServiceTest < ActiveSupport::TestCase
+  # Verifies real sample CSV produces both grouped team output and respondent details.
+  test "parses client_feedback csv into grouped dataset" do
+    file_path = Rails.root.join("client_feedback.csv")
+
+    result = CSVSurveyParserService.new(file: file_path.to_s).parse
+
+    assert result[:errors].empty?
+    refute_empty result[:dataset]
+
+    team_entry = result[:dataset].find { |row| row[:team].include?("Bugvengers") }
+    refute_nil team_entry
+    assert_includes team_entry[:responses], "nope :)"
+
+    refute_empty result[:respondents]
+    first_respondent = result[:respondents].first
+    assert_equal "R_38A4IT7WH5HvuuQ", first_respondent[:respondent_id]
+    refute_nil first_respondent[:metadata][:submitted_at]
+    assert_equal "Sprint 2", first_respondent[:metadata][:sprint]
+
+    scale_response = first_respondent[:responses].find { |response| response[:type] == :scale }
+    refute_nil scale_response
+  end
+
+  # Malformed CSV should be handled safely with errors populated, not exceptions.
+  test "returns empty dataset for malformed csv" do
+    malformed_csv = "Q1,Q3,Q7\n\"broken,Sprint 2,Feedback"
+
+    result = CSVSurveyParserService.new(csv_string: malformed_csv).parse
+
+    assert_empty result[:dataset]
+    refute_empty result[:errors]
+  end
+
+  # Q7 is required by the parsing plan for feedback extraction.
+  test "returns empty dataset when q7 is missing" do
+    csv_string = <<~CSV
+      Q1,Q3,Q6
+      Team,Sprint,Question
+      {"ImportId":"QID1"},{"ImportId":"QID3"},{"ImportId":"QID6_TEXT"}
+      Team A,Sprint 1,Some text
+    CSV
+
+    result = CSVSurveyParserService.new(csv_string: csv_string).parse
+
+    assert_empty result[:dataset]
+    assert_includes result[:errors].join(" "), "Q7"
+  end
+
+  # Team fallback keeps parse output usable when team field is missing.
+  test "falls back to Unknown Team when team is missing" do
+    csv_string = <<~CSV
+      Q1,Q3,Q7
+      Team,Sprint,Feedback
+      {"ImportId":"QID1"},{"ImportId":"QID3"},{"ImportId":"QID7_TEXT"}
+      ,Sprint 1,Need faster updates
+    CSV
+
+    result = CSVSurveyParserService.new(csv_string: csv_string).parse
+
+    assert_equal 1, result[:dataset].length
+    assert_equal "Unknown Team", result[:dataset][0][:team]
+    assert_equal ["Need faster updates"], result[:dataset][0][:responses]
+  end
+
+  # Empty Q7 rows should be ignored to avoid polluting LLM input.
+  test "skips rows with blank q7 feedback" do
+    csv_string = <<~CSV
+      Q1,Q3,Q7
+      Team,Sprint,Feedback
+      {"ImportId":"QID1"},{"ImportId":"QID3"},{"ImportId":"QID7_TEXT"}
+      Team A,Sprint 2,
+      Team A,Sprint 2,Great progress
+    CSV
+
+    result = CSVSurveyParserService.new(csv_string: csv_string).parse
+
+    assert_equal 1, result[:dataset].length
+    assert_equal ["Great progress"], result[:dataset][0][:responses]
+  end
+end

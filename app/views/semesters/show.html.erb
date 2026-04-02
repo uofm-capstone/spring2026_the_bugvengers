@@ -19,251 +19,24 @@
           </div>
         <% end %>
 
-        <div class="row">
-          <div class="mt-4 text-center">
-            <% if team_exist(@teams) %>
-              <h2>Team Status</h2>
-
-              <div class="mt-3 mb-3">
-                <h5>Legend:</h5>
-                <ul class="list-inline team-status-legend">
-                  <li class="list-inline-item team-status-legend-item">
-                    <span
-                      class="ui-tooltip"
-                      tabindex="0"
-                      aria-label="Good: everything required is present."
-                      data-tooltip="Good: Everything required is present (no warnings).">
-                      <%= image_tag "check-circle-fill.svg", class: "team-status-icon", alt: "", aria: { hidden: true } %>
-                    </span>
-                    <span>Good</span>
-                  </li>
-
-                  <li class="list-inline-item team-status-legend-item">
-                    <span
-                      class="ui-tooltip"
-                      tabindex="0"
-                      aria-label="Acceptable: some data may be missing, but not critical."
-                      data-tooltip="Acceptable: Minor issues or partial data; review if needed.">
-                      <%= image_tag "exclamation-circle-fill-yellow.svg", class: "team-status-icon", alt: "", aria: { hidden: true } %>
-                    </span>
-                    <span>Acceptable</span>
-                  </li>
-
-                  <li class="list-inline-item team-status-legend-item">
-                    <span
-                      class="ui-tooltip"
-                      tabindex="0"
-                      aria-label="Poor: action needed."
-                      data-tooltip="Poor: Missing submissions or low scores; action needed.">
-                      <%= image_tag "exclamation-triangle-fill-red.svg", class: "team-status-icon", alt: "", aria: { hidden: true } %>
-                    </span>
-                    <span>Poor</span>
-                  </li>
-
-                  <li class="list-inline-item team-status-legend-item">
-                    <span
-                      class="ui-tooltip"
-                      tabindex="0"
-                      aria-label="No data: nothing recorded yet."
-                      data-tooltip="No Data: No submission/metric recorded yet.">
-                      <%= image_tag "question-circle-fill.svg", class: "team-status-icon", alt: "", aria: { hidden: true } %>
-                    </span>
-                    <span>No Data</span>
-                  </li>
-                </ul>
+        <section class="semesters-status__section mt-4 text-center">
+            <h2 class="semesters-status__title">Team Status</h2>
+            <div class="alert alert-info semesters-status__loading" role="status" id="status-load-panel" style="opacity:1 !important; visibility:visible !important; transition:none !important;">
+              <div class="mb-2">Loading status metrics from GitHub. This page is ready while data loads.</div>
+              <div class="d-flex align-items-center justify-content-center gap-2">
+                <div class="spinner-border spinner-border-sm text-primary" role="status" aria-hidden="true" id="status-load-spinner"></div>
+                <strong id="status-load-text">Fetching Kanban + GitHub data...</strong>
               </div>
+              <small id="status-load-elapsed" class="d-block mt-2" style="color:#1e3a52;">Elapsed: 0s</small>
+            </div>
+        </section>
 
-              <!-- 🔹 Sprint Filter Buttons (includes "All") -->
-              <div class="text-center mb-3">
-                <button
-                  class="btn btn-outline-primary m-1 sprint-toggle active"
-                  data-sprint="all">
-                  All
-                </button>
-
-                <% @sprint_list.each do |sprint| %>
-                  <button
-                    class="btn btn-outline-primary m-1 sprint-toggle"
-                    data-sprint="<%= sprint.parameterize %>">
-                    <%= sprint %>
-                  </button>
-                <% end %>
-              </div>
-
-              <!-- TABLE -->
-              <div class="table-responsive team-status-table-wrap">
-                <table class="table table-bordered align-middle text-center team-status-table">
-                  <thead>
-                    <tr>
-                      <th class="sticky-col-1" rowspan="3">Team Name</th>
-                      <th class="sticky-col-2" rowspan="3">Member</th>
-                      <% @sprint_list.each do |sprint| %>
-                        <th colspan="15" class="sprint-group <%= sprint.parameterize %>"><%= sprint %></th>
-                      <% end %>
-                    </tr>
-
-                    <tr>
-                      <% @sprint_list.each do |sprint| %>
-                        <th colspan="4" class="sprint-group <%= sprint.parameterize %>">Planning</th>
-                        <th colspan="4" class="sprint-group <%= sprint.parameterize %>">PC</th>
-                        <th colspan="7" class="sprint-group <%= sprint.parameterize %>">Demo</th>
-                      <% end %>
-                    </tr>
-
-                    <tr>
-                      <% rubric_items = ["FS&D", "FA", "TE", "KU", "TS", "PP", "CC", "SR", "TSP", "PP", "PF", "CBP", "CC", "SR", "D"] %>
-                      <% @sprint_list.each do |sprint| %>
-                        <% rubric_items.each do |item| %>
-                          <% tooltip = case item
-                            when "FS&D" then "<strong>Feature Selection and Decomposition</strong><br><b>Metric:</b> Number of cards per column."
-                            when "FA"   then "<strong>Feature Assignments</strong><br><b>Metric:</b> Number of cards assigned to each team member."
-                            when "TE"   then "<strong>Feature Time Estimates</strong><br><b>Metric:</b> Sum of estimated hours per team member."
-                            when "KU"   then "<strong>Kanban Updates</strong><br><b>Metric:</b> N/A."
-                            when "TS"   then "<strong>Time Spent</strong><br><b>Metric:</b> N/A."
-                            when "PP"   then "<strong>Product Progress</strong><br><b>Metric:</b> Cards moved through workflow (To-Do → In-Progress → Done)."
-                            when "CC"   then "<strong>Client Communication</strong><br><b>Metric:</b> N/A."
-                            when "CBP"  then "<strong>Coding Best Practices</strong><br><b>Metric:</b> Count of commits and line changes."
-                            when "SR"   then "<strong>Status and Reflection</strong><br><b>Metric:</b> N/A."
-                            when "TSP"  then "<strong>Time Spent Since Progress Check</strong><br><b>Metric:</b> Work hours or updates since last check."
-                            when "PF"   then "<strong>Product Feedback</strong><br><b>Metric:</b> N/A."
-                            when "D"    then "<strong>Demo</strong><br><b>Metric:</b> N/A."
-                            else "<strong>Metric</strong><br><b>Metric:</b> Description unavailable."
-                          end %>
-
-                          <th
-                            class="sprint-group <%= sprint.parameterize %>"
-                            data-bs-toggle="tooltip"
-                            data-bs-html="true"
-                            data-bs-placement="top"
-                            title="<%= tooltip.html_safe %>"
-                            style="font-size: 0.75rem;">
-                            <%= item %>
-                          </th>
-                        <% end %>
-                      <% end %>
-                    </tr>
-                  </thead>
-
-                  <tbody>
-                    <% @teams.each do |team| %>
-                      <% team.students.each_with_index do |student, i| %>
-                        <tr>
-                          <% if i == 0 %>
-                            <td class="sticky-col-1" rowspan="<%= team.students.size %>">
-                              <div class="sticky-cell">
-                                <%= link_to team.name, teams_path(@semester), class: "text-decoration-none fw-semibold" %>
-                              </div>
-                            </td>
-                          <% end %>
-
-                          <td class="sticky-col-2">
-                            <div class="sticky-cell">
-                              <%= "#{student.name.split.first} #{student.name.split.last&.first}." %>
-                            </div>
-                          </td>
-
-                          <% @sprint_list.each do |sprint| %>
-                            <% rubric_items.each do |item| %>
-                              <td class="text-center sprint-group <%= sprint.parameterize %>">
-                                <% case item %>
-                                  <% when "FS&D" %>
-                                    <!-- Feature Selection and Decomposition — Metric: Number of cards per column -->
-                                    <% if !@team_project_data.nil? %>
-                                      <% column_count = @service.get_card_count_per_column(@team_project_data[team.name]) %>
-                                      <%= "#{column_count['Backlog']}, #{column_count['Todo']}, #{column_count['In Progress']}, #{column_count['Done']}" %>
-                                    <% end %>
-                                  <% when "FA" %>
-                                    <!-- Feature Assignments — Metric: Number of cards assigned to each team member -->
-                                    <% if !@team_project_data.nil? %>
-                                      <% assigned_count = @service.get_card_count_per_assignee(@team_project_data[team.name], student.github_username)[student.github_username] %>
-                                      <%= assigned_count %>
-                                    <% end %> 
-                                  <% when "TE" %>
-                                    <!-- Feature Time Estimates — Metric: Sum of estimated hours per team member -->
-                                    <% if !@team_project_data.nil? %>
-                                      <% estimated_hours = @service.get_total_hours_per_assignee(@team_project_data[team.name], student.github_username)[student.github_username] %>
-                                      <%= estimated_hours %>
-                                    <% end %>
-                                  <% when "PP" %>
-                                    <!-- Product Progress — Metric: Cards moved through workflow (To-Do → In-Progress → Done) per team member -->
-                                    <span class="ui-tooltip" tabindex="0" aria-label="OK" data-tooltip="OK">
-                                      <%= image_tag "check-circle-fill.svg", class: "team-status-icon", alt: "", aria: { hidden: true } %>
-                                    </span>
-
-                                  <% when "CBP" %>
-                                    <!-- Coding Best Practices — Metric: Count of commits and lines of code changed per team member -->
-                                    <span class="ui-tooltip" tabindex="0" aria-label="OK" data-tooltip="OK">
-                                      <%= image_tag "check-circle-fill.svg", class: "team-status-icon", alt: "", aria: { hidden: true } %>
-                                    </span>
-
-                                  <% when "TSP" %>
-                                    <!-- Time Spent Since Progress Check — Metric: Sum of work hours or task updates since last progress check -->
-                                    <span class="ui-tooltip" tabindex="0" aria-label="OK" data-tooltip="OK">
-                                      <%= image_tag "check-circle-fill.svg", class: "team-status-icon", alt: "", aria: { hidden: true } %>
-                                    </span>
-
-                                  <% when "KU", "TS", "CC", "SR", "PF", "D" %>
-                                    <!-- N/A metrics — Metric: Not applicable (no direct data collected) -->
-                                    <span class="ui-tooltip" tabindex="0" aria-label="No data / N/A" data-tooltip="No data / N/A">
-                                      <%= image_tag "question-circle-fill.svg", class: "team-status-icon", alt: "", aria: { hidden: true } %>
-                                    </span>
-
-                                  <% else %>
-                                    <!-- Unknown rubric type — Metric: Description unavailable -->
-                                    <span class="ui-tooltip" tabindex="0" aria-label="No data / N/A" data-tooltip="No data / N/A">
-                                      <%= image_tag "question-circle-fill.svg", class: "team-status-icon", alt: "", aria: { hidden: true } %>
-                                    </span>
-                                <% end %>
-                              </td>
-                            <% end %>
-                          <% end %>
-                        </tr>
-                      <% end %>
-                    <% end %>
-                  </tbody>
-                </table>
-              </div>
-
-              <!-- Deadline Cards -->
-              <div class="container mt-4">
-                <h3 class="text-center mb-4">Set Sprint Deadlines</h3>
-
-                <%= form_with url: save_sprints_semester_path(@semester), method: :post, local: true do %>
-                  <div class="d-flex flex-nowrap justify-content-between gap-3 px-2">
-                    <% (1..4).each do |i| %>
-                      <% sprint = @semester.sprints.find_by(name: "Sprint #{i}") || Sprint.new(name: "Sprint #{i}") %>
-
-                      <div class="card small-card flex-fill mx-1" style="min-width: 0;">
-                        <div class="card-body p-2">
-                          <h6 class="card-title mb-2 text-center">Sprint <%= i %></h6>
-
-                          <div class="mb-1">
-                            <%= label_tag "sprint_#{i}[planning_deadline]", "Planning Deadline", class: "form-label mb-0" %>
-                            <%= date_field_tag "sprint_#{i}[planning_deadline]", sprint.planning_deadline, class: "form-control form-control-sm" %>
-                          </div>
-
-                          <div class="mb-1">
-                            <%= label_tag "sprint_#{i}[progress_deadline]", "Progress Check", class: "form-label mb-0" %>
-                            <%= date_field_tag "sprint_#{i}[progress_deadline]", sprint.progress_deadline, class: "form-control form-control-sm" %>
-                          </div>
-
-                          <div class="mb-1">
-                            <%= label_tag "sprint_#{i}[demo_deadline]", "Demo Deadline", class: "form-label mb-0" %>
-                            <%= date_field_tag "sprint_#{i}[demo_deadline]", sprint.demo_deadline, class: "form-control form-control-sm" %>
-                          </div>
-                        </div>
-                      </div>
-                    <% end %>
-                  </div>
-
-                  <div class="text-center mt-3">
-                    <%= submit_tag "Save All Deadlines", class: "btn btn-primary px-4" %>
-                  </div>
-                <% end %>
-              </div>
-            <% end %>
+        <%= turbo_frame_tag "semester-status-content",
+          data: { status_src: semester_status_content_path(@semester, debug: params[:debug]) } do %>
+          <div class="text-center text-muted py-3" id="status-frame-placeholder">
+            Status request started. Waiting for server response...
           </div>
-        </div>
+        <% end %>
       </div>
     </div>
   </div>
@@ -308,8 +81,249 @@
           }
         });
       });
+
     } 
+
+    let statusProgressTimer;
+    let statusElapsedTimer;
+    let statusElapsedSeconds = 0;
+    const STATUS_REQUEST_TIMEOUT_MS = 60000;
+
+    function ensurePanelVisible() {
+      const panel = document.getElementById("status-load-panel");
+      if (!panel) return;
+
+      panel.style.display = "block";
+      panel.style.opacity = "1";
+      panel.style.visibility = "visible";
+    }
+
+    function setStatusProgress(value, label) {
+      const text = document.getElementById("status-load-text");
+      ensurePanelVisible();
+      if (text && label) text.textContent = label;
+    }
+
+    function startStatusProgress() {
+      clearInterval(statusProgressTimer);
+      clearInterval(statusElapsedTimer);
+      statusElapsedSeconds = 0;
+      let value = 8;
+      ensurePanelVisible();
+      setStatusProgress(value, "Fetching Kanban + GitHub data...");
+      const spinner = document.getElementById("status-load-spinner");
+      if (spinner) spinner.style.display = "inline-block";
+
+      const elapsed = document.getElementById("status-load-elapsed");
+      if (elapsed) elapsed.textContent = "Elapsed: 0s";
+
+      statusElapsedTimer = setInterval(() => {
+        statusElapsedSeconds += 1;
+        if (elapsed) elapsed.textContent = `Elapsed: ${statusElapsedSeconds}s`;
+
+        if (statusElapsedSeconds > 12 && statusElapsedSeconds <= 25) {
+          setStatusProgress(value, "Still working... checking GitHub activity.");
+        } else if (statusElapsedSeconds > 25) {
+          setStatusProgress(value, "Still working... this first load can take longer.");
+        }
+      }, 1000);
+
+      // Simulate meaningful progress while waiting for network-bound API work.
+      statusProgressTimer = setInterval(() => {
+        value = Math.min(92, value + Math.max(1, Math.round((95 - value) * 0.12)));
+        setStatusProgress(value, null);
+      }, 450);
+    }
+
+    function completeStatusProgress(message) {
+      clearInterval(statusProgressTimer);
+      clearInterval(statusElapsedTimer);
+      setStatusProgress(100, message || "Status metrics loaded.");
+      const panel = document.getElementById("status-load-panel");
+      if (panel) {
+        panel.classList.remove("alert-info");
+        panel.classList.add("alert-success");
+      }
+      const spinner = document.getElementById("status-load-spinner");
+      if (spinner) spinner.style.display = "none";
+      const elapsed = document.getElementById("status-load-elapsed");
+      if (elapsed) elapsed.textContent = `Elapsed: ${statusElapsedSeconds}s`;
+
+      if (panel) {
+        setTimeout(() => {
+          panel.style.display = "none";
+        }, 300);
+      }
+    }
+
+    function hasRenderableStatusContent(frame) {
+      if (!frame) return false;
+
+      // Success state: explicit marker rendered only by _status_content partial.
+      return Boolean(frame.querySelector('[data-status-content-ready="1"]'));
+    }
+
+    // Upload sponsor CSV asynchronously so GitHub status data is not reloaded.
+    function initSponsorCsvUpload() {
+      if (document.documentElement.dataset.sponsorUploadBound === "1") return;
+      document.documentElement.dataset.sponsorUploadBound = "1";
+
+      document.addEventListener("submit", async (event) => {
+        const form = event.target;
+        if (!(form instanceof HTMLFormElement)) return;
+        if (form.dataset.sponsorUploadForm !== "1") return;
+
+        event.preventDefault();
+
+        const sprintKey = form.dataset.sponsorSprintKey;
+        const control = sprintKey ? document.querySelector(`[data-sponsor-control="${sprintKey}"]`) : null;
+        const fileInput = form.querySelector('input[name="sponsor_csv"]');
+        const feedbackEl = control ? control.querySelector('[data-sponsor-upload-feedback]') : null;
+        const hintEl = control ? control.querySelector('[data-sponsor-upload-hint]') : null;
+        const actionEl = control ? control.querySelector('[data-sponsor-actions]') : null;
+
+        if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
+          if (feedbackEl) {
+            feedbackEl.textContent = "Please choose a CSV file before uploading.";
+            feedbackEl.className = "small text-danger";
+          }
+          return;
+        }
+
+        const submitBtn = form.querySelector('input[type="submit"], button[type="submit"]');
+        const originalBtnText = submitBtn ? submitBtn.value || submitBtn.textContent : null;
+        if (submitBtn) {
+          submitBtn.disabled = true;
+          if ("value" in submitBtn) {
+            submitBtn.value = "Uploading...";
+          } else {
+            submitBtn.textContent = "Uploading...";
+          }
+        }
+
+        try {
+          const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute("content");
+          const response = await fetch(form.action, {
+            method: "POST",
+            credentials: "same-origin",
+            headers: {
+              Accept: "application/json",
+              "X-CSRF-Token": csrf || ""
+            },
+            body: new FormData(form)
+          });
+
+          const payload = await response.json().catch(() => ({}));
+
+          if (!response.ok || !payload.success) {
+            throw new Error(payload.message || "Sponsor CSV upload failed.");
+          }
+
+          if (hintEl) hintEl.classList.add("d-none");
+          if (actionEl) actionEl.classList.remove("d-none");
+          if (feedbackEl) {
+            feedbackEl.textContent = payload.message || "Sponsor CSV uploaded successfully.";
+            feedbackEl.className = "small text-success";
+          }
+
+          const modalsContainer = document.getElementById("sponsor-modals-container");
+          if (modalsContainer && payload.modals_html) {
+            modalsContainer.innerHTML = payload.modals_html;
+          }
+
+          form.reset();
+        } catch (error) {
+          if (feedbackEl) {
+            feedbackEl.textContent = error.message || "Sponsor CSV upload failed.";
+            feedbackEl.className = "small text-danger";
+          }
+        } finally {
+          if (submitBtn) {
+            submitBtn.disabled = false;
+            if (originalBtnText !== null) {
+              if ("value" in submitBtn) {
+                submitBtn.value = originalBtnText;
+              } else {
+                submitBtn.textContent = originalBtnText;
+              }
+            }
+          }
+        }
+      });
+    }
+
+    // Fallback loader: only runs if Turbo frame hydration appears stuck.
+    async function requestStatusContent() {
+      const frame = document.getElementById("semester-status-content");
+      if (!frame) return;
+
+      if (frame.dataset.requestStarted === "1") return;
+      frame.dataset.requestStarted = "1";
+
+      const src = frame.dataset.statusSrc;
+      if (!src) return;
+
+      let controller;
+      let timeoutId;
+
+      try {
+        if (typeof AbortController !== "undefined") {
+          controller = new AbortController();
+          timeoutId = setTimeout(() => controller.abort(), STATUS_REQUEST_TIMEOUT_MS);
+        }
+
+        const response = await fetch(src, {
+          headers: {
+            Accept: "text/html"
+          },
+          credentials: "same-origin",
+          signal: controller ? controller.signal : undefined
+        });
+        if (!response.ok) throw new Error(`HTTP_${response.status}`);
+
+        const html = await response.text();
+        const parsed = new DOMParser().parseFromString(html, "text/html");
+        const returnedFrame = parsed.getElementById("semester-status-content");
+
+        if (returnedFrame) {
+          frame.innerHTML = returnedFrame.innerHTML;
+        } else if (parsed.querySelector('[data-status-content-ready="1"]')) {
+          frame.innerHTML = html;
+        } else {
+          throw new Error("MISSING_READY_MARKER");
+        }
+
+        if (hasRenderableStatusContent(frame)) {
+          frame.dataset.loaded = "1";
+          completeStatusProgress("Status metrics loaded.");
+          initTooltipsAndSprintFilter();
+        }
+      } catch (e) {
+        const panel = document.getElementById("status-load-panel");
+        if (panel) {
+          panel.classList.remove("alert-success");
+          panel.classList.add("alert-warning");
+        }
+
+        if (e && e.name === "AbortError") {
+          setStatusProgress(95, "Status request timed out. Please refresh to retry.");
+        } else {
+          setStatusProgress(95, "Status request failed. Please refresh to retry.");
+        }
+
+        clearInterval(statusProgressTimer);
+        clearInterval(statusElapsedTimer);
+      } finally {
+        if (timeoutId) clearTimeout(timeoutId);
+      }
+    }
 
     document.addEventListener("DOMContentLoaded", initTooltipsAndSprintFilter);
     document.addEventListener("turbo:load", initTooltipsAndSprintFilter);
+    document.addEventListener("DOMContentLoaded", startStatusProgress);
+    document.addEventListener("turbo:load", startStatusProgress);
+    document.addEventListener("DOMContentLoaded", requestStatusContent);
+    document.addEventListener("turbo:load", requestStatusContent);
+    document.addEventListener("DOMContentLoaded", initSponsorCsvUpload);
+    document.addEventListener("turbo:load", initSponsorCsvUpload);
   </script>

@@ -1,0 +1,38 @@
+<div class="team-overview-grid mb-4">
+  <% team_status_overview.each do |summary| %>
+    <article
+      class="team-overview-card"
+      data-team-card="1"
+      data-team-id="<%= summary[:team_id] %>"
+      data-at-risk="<%= summary[:any_at_risk] %>"
+      data-missing-done="<%= summary[:any_missing_sprint_done] %>">
+      <h5 class="team-overview-name mb-1"><%= summary[:team_name] %></h5>
+      <p class="team-overview-meta mb-2"><%= summary[:students_count] %> students</p>
+
+      <% if summary[:any_at_risk] %>
+        <p class="team-overview-risk mb-2">At risk: <%= team_risk_reason_preview(summary) %></p>
+      <% else %>
+        <p class="team-overview-ok mb-2">No active TA flags for current data.</p>
+      <% end %>
+
+      <div class="team-overview-sprints">
+        <% sprint_list.each do |sprint| %>
+          <% sprint_metric = summary.dig(:sprint_metrics, sprint) || {} %>
+          <% github_metric = sprint_metric[:github] || {} %>
+          <div class="team-overview-sprint-pill <%= sprint_pill_state_class(sprint_metric) %>">
+            <strong><%= sprint %></strong>
+            <span>Done: <%= sprint_metric[:sprint_done_cards] || 0 %></span>
+            <span>Taken: <%= sprint_metric[:time_spent_hours] || 0 %>h</span>
+            <% if github_metric[:data_available] || github_metric[:score].to_f.positive? %>
+              <span>GitHub: <%= github_metric[:score] || 0 %>%</span>
+              <span><%= github_metric[:band] || "No Data" %></span>
+            <% else %>
+              <span>GitHub: N/A</span>
+              <span><%= format_missing_github_flags(github_metric[:missing_data_flags]) %></span>
+            <% end %>
+          </div>
+        <% end %>
+      </div>
+    </article>
+  <% end %>
+</div>

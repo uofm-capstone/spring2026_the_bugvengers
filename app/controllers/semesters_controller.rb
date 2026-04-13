@@ -598,9 +598,27 @@ end
 
     rows.map do |row|
       responses = detail_keys.map do |key|
-        question = full_questions[key.to_s].presence || key.to_s.upcase
-        answer = row[key].to_s.strip
-        { question: question, answer: answer.presence || "Not answered" }
+        # Prefer descriptive prompt text from parser map; keep resilient fallbacks
+        # for older CSV formats where prompt metadata may be incomplete.
+        question_key = key.to_s
+        question = full_questions[question_key].presence || full_questions[question_key.downcase].presence || key.to_s.upcase
+        raw_answer = row[key].to_s.strip
+        answer_text = raw_answer.presence || "Not answered"
+
+        # Qualtrics q2_* prompts are often shaped like:
+        # "Please evaluate ... - The team was on time ..."
+        # For table readability, keep the shared prompt in the Question column
+        # and move the statement-specific clause to the Answer column.
+        if question_key.match?(/\Aq2_\d+\z/i) && question.include?(" - ")
+          base_prompt, criterion = question.split(/\s+-\s+/, 2)
+
+          if base_prompt.present? && criterion.present?
+            question = base_prompt.strip
+            answer_text = "#{criterion.strip}: #{answer_text}"
+          end
+        end
+
+        { question: question, answer: answer_text }
       end
 
       {

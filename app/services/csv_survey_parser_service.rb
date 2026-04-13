@@ -259,13 +259,20 @@ class CSVSurveyParserService
     :text
   end
 
-  # Builds a question-code to full prompt map for q2_* fields used by the UI.
+  # Builds a question-code to full prompt map used by sponsor question display.
+  #
+  # We include every response-bearing column (q2_* + q4..q7) so the Questions
+  # modal can always render human-readable prompt text instead of header codes.
+  # Keys are normalized to downcase so callers using symbolized/normalized row
+  # keys can perform stable lookups without case mismatches.
   def build_full_questions(headers, question_row)
     headers.each_with_index.with_object({}) do |(header, index), acc|
-      next unless header.to_s.match?(/\Aq2_\d+\z/i)
+      next unless RESPONSE_HEADERS.any? { |pattern| header.to_s.match?(pattern) }
 
-      # q2_* prompt text is shown in the team view.
-      acc[header] = question_row[index].to_s.strip
+      normalized_key = header.to_s.strip.downcase
+      next if normalized_key.blank?
+
+      acc[normalized_key] = question_row[index].to_s.strip
     end
   end
 

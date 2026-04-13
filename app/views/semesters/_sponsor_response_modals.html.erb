@@ -18,7 +18,21 @@
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
         <div class="modal-body">
-          <p class="mb-2"><%= @sponsor_summary_text[sprint_label] %></p>
+          <% raw_summary = @sponsor_summary_text[sprint_label].to_s %>
+          <% summary_lines = raw_summary.split(/\r?\n+/).map(&:strip).reject(&:blank?) %>
+          <% if summary_lines.size <= 1 && raw_summary.include?(" - ") %>
+            <% summary_lines = raw_summary.split(/\s+-\s+/).map(&:strip).reject(&:blank?) %>
+          <% end %>
+
+          <% if summary_lines.present? %>
+            <ul class="mb-2 ps-4 text-start" style="list-style-position: outside;">
+              <% summary_lines.each do |line| %>
+                <li class="mb-1"><%= line.sub(/\A-\s*/, "") %></li>
+              <% end %>
+            </ul>
+          <% else %>
+            <p class="mb-2">No summary available.</p>
+          <% end %>
           <p class="mb-0 text-muted small">Parsed responses: <%= @sponsor_rows_count[sprint_label] %></p>
         </div>
         <div class="modal-footer">

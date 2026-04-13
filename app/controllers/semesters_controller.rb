@@ -418,13 +418,17 @@ end
       # run summary analysis only when the user explicitly uploads a CSV.
       # We never trigger LLM analysis from page-load rendering paths.
       if success
-        summary_result = generate_and_store_sponsor_summary(sprint_number: sprint_number)
+        summary_result = generate_sponsor_summary(sprint_number: sprint_number)
+
+        # Without persistence, the current request must carry the generated
+        # summary into modal rendering. This applies to both success and
+        # fallback outputs so users always see immediate upload feedback.
+        summary_override_text = summary_result[:summary_text]
 
         unless summary_result[:ok]
           # Keep upload successful even when LLM fails so teams do not lose CSV data.
           # The fallback summary gives immediate UI feedback and can be overwritten
           # by a future re-upload once the LLM endpoint is healthy.
-          summary_override_text = summary_result[:summary_text]
           message = "#{sprint_label} sponsor CSV uploaded, but summary generation had a warning: #{summary_result[:message]}"
         end
       end
@@ -432,8 +436,8 @@ end
       message = "Please choose a CSV file before uploading."
     end
 
-    # Upload can return one-off override text (for failed LLM calls) while
-    # all normal rendering still reads persisted values from Semester columns.
+    # Upload response can include one-off summary text for this request only.
+    # This keeps summary rendering transient and avoids cross-page persistence.
     @sponsor_summary_overrides = { sprint_label => summary_override_text }
     build_sponsor_ui_payload!
 
@@ -573,42 +577,17 @@ end
     end
   end
 
-  # Maps sprint numbers to persisted summary columns.
-  # Keeping explicit mapping avoids accidental dynamic method calls and makes
-  # schema coupling obvious for future maintainers.
-  def sponsor_summary_column_for_sprint(sprint_number)
-    case sprint_number.to_s
-    when "2"
-      :sponsor_summary_sprint_2
-    when "3"
-      :sponsor_summary_sprint_3
-    when "4"
-      :sponsor_summary_sprint_4
-    end
-  end
-
-  # Executes parse + LLM summary generation through SponsorSummaryService,
-  # then persists the resulting summary text to Semester for read-time reuse.
-  def generate_and_store_sponsor_summary(sprint_number:)
-    summary_column = sponsor_summary_column_for_sprint(sprint_number)
-    return { ok: false, summary_text: nil, message: "Invalid sprint for summary persistence." } unless summary_column
-
-    result = SponsorSummaryService.new(semester: @semester, sprint_number: sprint_number).generate
-
-    # Persist even fallback text so status page behavior is deterministic after
-    # upload and does not silently revert to placeholders on refresh.
-    if result[:summary_text].present?
-      @semester.update(summary_column => result[:summary_text])
-    end
-
-    result
+  # Executes parse + LLM summary generation through SponsorSummaryService.
+  # Summary storage is handled separately in session-scoped cache helpers.
+  def generate_sponsor_summary(sprint_number:)
+    SponsorSummaryService.new(semester: @semester, sprint_number: sprint_number).generate
   rescue StandardError => e
-    Rails.logger.error("Sponsor summary persistence failed for semester #{@semester.id}: #{e.class} - #{e.message}")
+    Rails.logger.error("Sponsor summary generation failed for semester #{@semester.id}: #{e.class} - #{e.message}")
 
     {
       ok: false,
       summary_text: SponsorSummaryService::FALLBACK_SUMMARY_TEXT,
-      message: "Summary persistence failed after upload."
+      message: "Summary generation failed after upload."
     }
   end
 
@@ -793,9 +772,6 @@ end
     @sponsor_details = {}
 
     sponsor_sources.each do |sprint_label, attachment|
-      sprint_number = sprint_label.split.last.to_s
-      summary_column = sponsor_summary_column_for_sprint(sprint_number)
-      persisted_summary = summary_column ? @semester.public_send(summary_column) : nil
       override_summary = @sponsor_summary_overrides&.[](sprint_label)
 
       @sponsor_csv_attached[sprint_label] = attachment.attached?
@@ -815,12 +791,10 @@ end
 
       # Summary display precedence:
       # 1) upload-time override for this request (typically LLM warning fallback)
-      # 2) persisted DB summary generated during a prior upload
-      # 3) explicit waiting message when a CSV exists but summary is still missing
+      # 2) explicit waiting message when a CSV exists but summary is not part
+      #    of the current request lifecycle.
       @sponsor_summary_text[sprint_label] = if override_summary.present?
                                               override_summary
-                                            elsif persisted_summary.present?
-                                              persisted_summary
                                             else
                                               "#{sprint_label} sponsor CSV uploaded. Summary has not been generated yet. Re-upload to retry analysis."
                                             end

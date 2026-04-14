@@ -44,6 +44,7 @@
           <th>Email</th>
           <th>Role</th>
           <th>Last Logged In</th>
+          <th>Activity Status</th>
           <th>Actions</th>
         </tr>
       </thead>
@@ -55,6 +56,13 @@
             <td><%= role_badge(user) %></td>
             <td>
               <%= user.last_login_at ? user.last_login_at.strftime("%Y-%m-%d %H:%M") : "Never" %>
+            </td>
+            <td>
+              <% if user.is_active %>
+                <span style="color: green; font-weight: bold;">✔</span>
+              <% else %>
+                <span style="color: red; font-weight: bold;">✖</span>
+              <% end %>
             </td>
             <td>
               <div class="admin-dashboard__actions">

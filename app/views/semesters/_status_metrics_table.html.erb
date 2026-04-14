@@ -90,25 +90,7 @@
                     <% when "TT" %>
                       <%= metric.dig(:ts, :time_spent_hours) || 0 %>
                     <% when "Last Commit" %>
-                      <% ku_metric = metric[:ku] || {} %>
-                      <% github_metric = metric[:github] || {} %>
-                      <div class="github-score-cell">
-                        <% if ku_metric[:band] != "No Data" %>
-                          <span class="github-score-badge <%= github_score_state_class(ku_metric[:score]) %>">
-                            <%= ku_metric[:score] || 0 %>%
-                          </span>
-                          <span class="github-band"><%= ku_metric[:band] || "No Data" %></span>
-                        <% else %>
-                          <span class="github-score-badge is-watch">N/A</span>
-                          <span class="github-band">No Data</span>
-                        <% end %>
-                        <div class="github-score-chips">
-                          <span class="github-chip" data-bs-toggle="tooltip" data-bs-placement="top" title="<%= github_chip_tooltip('GH') %>">GH <%= compact_score(github_metric[:score]) %></span>
-                          <span class="github-chip" data-bs-toggle="tooltip" data-bs-placement="top" title="<%= github_chip_tooltip('CBP') %>">CBP <%= compact_score(github_metric[:cbp_score]) %></span>
-                          <span class="github-chip" data-bs-toggle="tooltip" data-bs-placement="top" title="<%= github_chip_tooltip('PR') %>">PR <%= compact_score(github_metric[:pr_score]) %></span>
-                          <span class="github-chip" data-bs-toggle="tooltip" data-bs-placement="top" title="<%= github_chip_tooltip('RVW') %>">RVW <%= compact_score(github_metric[:review_score]) %></span>
-                        </div>
-                      </div>
+                      <span class="github-band"><%= formatted_last_commit_display(metric) %></span>
                     <% when "PP" %>
                       <% done_count = metric.dig(:fsd, :done).to_i %>
                       <% total_count = metric.dig(:fa, :assigned_cards).to_i %>

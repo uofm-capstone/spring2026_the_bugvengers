@@ -78,4 +78,34 @@ module SemestersHelper
     Array(flags).map { |flag| flag.to_s.tr("_", " ") }.map(&:capitalize).join(", ")
   end
 
+  def formatted_last_commit_display(metric)
+    payload = metric[:last_commit] || {}
+    flags = Array(payload[:missing_data_flags]).map(&:to_s)
+    data_available = payload[:data_available]
+    timestamp = payload[:at].presence || metric[:last_commit_at].presence
+
+    return "No GitHub username" if flags.include?("no_github_username")
+
+    unavailable_flags = %w[repo_missing token_unavailable github_query_failed github_query_timeout github_student_data_unavailable]
+    return "GitHub data unavailable" if data_available == false || (flags & unavailable_flags).any?
+
+    return format_last_commit_timestamp(timestamp) if timestamp.present?
+
+    "No commits in sprint"
+  end
+
+  def format_last_commit_timestamp(timestamp)
+    time = if timestamp.respond_to?(:in_time_zone)
+      timestamp
+    else
+      Time.zone.parse(timestamp.to_s)
+    end
+
+    return timestamp.to_s if time.blank?
+
+    time.in_time_zone("America/Chicago").strftime("%b %-d, %Y %-l:%M %p CT")
+  rescue ArgumentError, TypeError
+    timestamp.to_s
+  end
+
 end

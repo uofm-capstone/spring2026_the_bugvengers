@@ -99,3 +99,19 @@
     </table>
   </div>
 </section>
+<p></p>
+<section class="admin-dashboard__chart-card ui-card__body mb-4">
+  <h3>Login Activity (Last 7 Days)</h3>
+  <%= column_chart @login_counts,
+  height: "300px",
+  colors: ["#2563eb"],
+  xtitle: "Date",
+  ytitle: "Logins",
+  library: {
+    plugins: {
+      legend: { display: false }},
+    scales: {
+      x: {grid: { display: false }},
+      y: {beginAtZero: true}}}
+  %>
+</section>

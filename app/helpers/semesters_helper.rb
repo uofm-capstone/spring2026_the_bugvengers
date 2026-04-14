@@ -108,4 +108,44 @@ module SemestersHelper
     timestamp.to_s
   end
 
+  def team_last_commit_summary(team:, sprint:, status_metrics:)
+    student_metrics = team.students.map do |student|
+      status_metrics.dig(team.id, student.id, sprint) || {}
+    end
+
+    latest_commit = student_metrics
+      .filter_map { |metric| metric.dig(:last_commit, :at).presence || metric[:last_commit_at].presence }
+      .filter_map { |value| parse_last_commit_time(value) }
+      .max
+
+    return "Latest: #{format_last_commit_timestamp(latest_commit)}" if latest_commit.present?
+    return "GitHub data unavailable" if team_last_commit_data_unavailable?(student_metrics)
+
+    "No commits in sprint"
+  end
+
+  def team_last_commit_data_unavailable?(student_metrics)
+    unavailable_flags = %w[
+      repo_missing
+      token_unavailable
+      github_query_failed
+      github_query_timeout
+      github_student_data_unavailable
+    ]
+
+    Array(student_metrics).any? do |metric|
+      payload = metric[:last_commit] || {}
+      flags = Array(payload[:missing_data_flags]).map(&:to_s)
+      payload[:data_available] == false || (flags & unavailable_flags).any?
+    end
+  end
+
+  def parse_last_commit_time(value)
+    return value if value.respond_to?(:in_time_zone)
+
+    Time.zone.parse(value.to_s)
+  rescue ArgumentError, TypeError
+    nil
+  end
+
 end

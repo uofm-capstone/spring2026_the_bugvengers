@@ -161,24 +161,7 @@
                   <% when "TT" %>
                     <strong><%= team_metric[:time_spent_hours] || 0 %></strong>
                   <% when "Last Commit" %>
-                    <% github_metric = team_metric[:github] || {} %>
-                    <div class="github-score-cell">
-                      <% if team_metric[:ku_band] != "No Data" %>
-                        <strong class="github-score-badge <%= github_score_state_class(team_metric[:ku_score]) %>">
-                          <%= team_metric[:ku_score] || 0 %>%
-                        </strong>
-                        <span class="github-band"><%= team_metric[:ku_band] || "No Data" %></span>
-                      <% else %>
-                        <strong class="github-score-badge is-watch">N/A</strong>
-                        <span class="github-band">No Data</span>
-                      <% end %>
-                      <div class="github-score-chips">
-                        <span class="github-chip" data-bs-toggle="tooltip" data-bs-placement="top" title="<%= github_chip_tooltip('GH') %>">GH <%= compact_score(github_metric[:score]) %></span>
-                        <span class="github-chip" data-bs-toggle="tooltip" data-bs-placement="top" title="<%= github_chip_tooltip('CBP') %>">CBP <%= compact_score(github_metric[:cbp_score]) %></span>
-                        <span class="github-chip" data-bs-toggle="tooltip" data-bs-placement="top" title="<%= github_chip_tooltip('PR') %>">PR <%= compact_score(github_metric[:pr_score]) %></span>
-                        <span class="github-chip" data-bs-toggle="tooltip" data-bs-placement="top" title="<%= github_chip_tooltip('RVW') %>">RVW <%= compact_score(github_metric[:review_score]) %></span>
-                      </div>
-                    </div>
+                    <strong class="github-band"><%= team_last_commit_summary(team: team, sprint: sprint, status_metrics: status_metrics) %></strong>
                   <% when "PP" %>
                     <strong><%= team_metric[:pp_completion_pct] || 0 %>% (<%= team_metric[:pp_band] || "No Data" %>)</strong>
                     <div class="github-band"><%= team_metric[:done_cards].to_i %>/<%= team_metric[:total_cards].to_i %> done</div>

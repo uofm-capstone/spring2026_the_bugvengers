@@ -1135,6 +1135,7 @@ end
 
     cbp_by_user = team_service.commit_metrics_by_user(repo, start_date, end_date)
     last_commit_at_by_user = team_service.last_commit_at_by_user(repo, start_date, end_date)
+    overall_last_commit_at_by_user = team_service.last_commit_at_by_user(repo, nil, nil)
     pr_by_user = team_service.pr_metrics_by_user(repo, start_date, end_date)
     review_by_user = team_service.review_metrics_by_user(repo, start_date, end_date)
 
@@ -1150,7 +1151,7 @@ end
       per_student[username] = {
         data_available: true,
         missing_data_flags: [],
-        last_commit_at: last_commit_at_by_user[username],
+        last_commit_at: last_commit_at_by_user[username] || overall_last_commit_at_by_user[username],
         cbp: {
           commit_count: cbp.commit_count,
           lines_added: cbp.lines_added,
@@ -1401,14 +1402,24 @@ end
     matching_cards = cards.select { |card| card_matches_sprint?(card, sprint) }
     return matching_cards if matching_cards.any?
 
-    return [] unless sprint_in_progress?(sprint)
+    return [] unless sprint_in_progress?(sprint) || latest_sprint_in_semester?(sprint)
 
-    # Fallback only for the active sprint when cards are not explicitly tagged.
-    # This prevents Sprint 4 from inheriting Sprint 3 values.
+    # Fallback for active/latest sprint when cards are not explicitly tagged.
+    # Older sprints still require explicit sprint tagging.
     cards.select do |card|
       status = card.status.to_s
       %w[Backlog Todo To\ Do In\ Progress Done].include?(status)
     end
+  end
+
+  def latest_sprint_in_semester?(sprint)
+    return false if sprint.blank? || @sprints.blank?
+
+    current_number = sprint.name.to_s[/\d+/].to_i
+    sprint_numbers = @sprints.map { |item| item.name.to_s[/\d+/].to_i }.select(&:positive?)
+    return current_number == sprint_numbers.max if current_number.positive? && sprint_numbers.any?
+
+    @sprints.last == sprint
   end
 
   def card_matches_sprint?(card, sprint)

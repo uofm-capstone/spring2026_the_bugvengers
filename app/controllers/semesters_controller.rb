@@ -846,15 +846,22 @@ end
     student_pp_band = assigned_card_count.zero? ? "No Data" : pp_band_for(student_pp_completion_pct)
 
     if github_student_metrics.blank?
-      inferred_flags = Array(team_missing_data_flags).presence || ["github_student_data_unavailable"]
+      student_username_missing = student.github_username.to_s.strip.blank?
+      inferred_flags = if student_username_missing
+        ["no_github_username"]
+      else
+        Array(team_missing_data_flags).presence || ["github_student_data_unavailable"]
+      end
+
       github_student_metrics = empty_student_github_metrics(
         missing_data_flags: inferred_flags,
-        data_available: team_github_available
+        data_available: student_username_missing ? false : team_github_available
       )
     end
     cbp_data = github_student_metrics[:cbp] || {}
     pr_data = github_student_metrics[:pr] || {}
     review_data = github_student_metrics[:review] || {}
+    last_commit_at = github_student_metrics[:last_commit_at]
     missing_data_flags = Array(github_student_metrics[:missing_data_flags])
 
     cbp_score = score_cbp(
@@ -923,6 +930,12 @@ end
       cbp: cbp_data,
       pr: pr_data,
       review: review_data,
+      last_commit_at: last_commit_at,
+      last_commit: {
+        at: last_commit_at,
+        data_available: github_student_metrics[:data_available],
+        missing_data_flags: missing_data_flags
+      },
       github: {
         score: github_score,
         band: github_band,
@@ -930,6 +943,7 @@ end
         pr_score: pr_score,
         review_score: review_score,
         kanban_score: student_kanban_score,
+        last_commit_at: last_commit_at,
         data_available: github_student_metrics[:data_available],
         missing_data_flags: missing_data_flags
       }

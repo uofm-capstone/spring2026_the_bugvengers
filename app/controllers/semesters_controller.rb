@@ -911,15 +911,22 @@ end
     student_pp_band = assigned_card_count.zero? ? "No Data" : pp_band_for(student_pp_completion_pct)
 
     if github_student_metrics.blank?
-      inferred_flags = Array(team_missing_data_flags).presence || ["github_student_data_unavailable"]
+      student_username_missing = student.github_username.to_s.strip.blank?
+      inferred_flags = if student_username_missing
+        ["no_github_username"]
+      else
+        Array(team_missing_data_flags).presence || ["github_student_data_unavailable"]
+      end
+
       github_student_metrics = empty_student_github_metrics(
         missing_data_flags: inferred_flags,
-        data_available: team_github_available
+        data_available: student_username_missing ? false : team_github_available
       )
     end
     cbp_data = github_student_metrics[:cbp] || {}
     pr_data = github_student_metrics[:pr] || {}
     review_data = github_student_metrics[:review] || {}
+    last_commit_at = github_student_metrics[:last_commit_at]
     missing_data_flags = Array(github_student_metrics[:missing_data_flags])
 
     cbp_score = score_cbp(
@@ -988,6 +995,12 @@ end
       cbp: cbp_data,
       pr: pr_data,
       review: review_data,
+      last_commit_at: last_commit_at,
+      last_commit: {
+        at: last_commit_at,
+        data_available: github_student_metrics[:data_available],
+        missing_data_flags: missing_data_flags
+      },
       github: {
         score: github_score,
         band: github_band,
@@ -995,6 +1008,7 @@ end
         pr_score: pr_score,
         review_score: review_score,
         kanban_score: student_kanban_score,
+        last_commit_at: last_commit_at,
         data_available: github_student_metrics[:data_available],
         missing_data_flags: missing_data_flags
       }
@@ -1120,6 +1134,7 @@ end
     end_date = sprint.end_date || Date.current.end_of_month
 
     cbp_by_user = team_service.commit_metrics_by_user(repo, start_date, end_date)
+    last_commit_at_by_user = team_service.last_commit_at_by_user(repo, start_date, end_date)
     pr_by_user = team_service.pr_metrics_by_user(repo, start_date, end_date)
     review_by_user = team_service.review_metrics_by_user(repo, start_date, end_date)
 
@@ -1135,6 +1150,7 @@ end
       per_student[username] = {
         data_available: true,
         missing_data_flags: [],
+        last_commit_at: last_commit_at_by_user[username],
         cbp: {
           commit_count: cbp.commit_count,
           lines_added: cbp.lines_added,
@@ -1189,6 +1205,7 @@ end
     {
       data_available: !!data_available,
       missing_data_flags: Array(missing_data_flags),
+      last_commit_at: nil,
       cbp: { commit_count: 0, lines_added: 0, lines_removed: 0, lines_changed: 0 },
       pr: { opened_count: 0, merged_count: 0, open_count: 0, avg_merge_hours: 0.0 },
       review: { review_count: 0, approvals: 0, changes_requested: 0 }

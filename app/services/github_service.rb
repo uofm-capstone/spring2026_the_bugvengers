@@ -369,6 +369,40 @@ class GithubService
     {}
   end
 
+  def last_commit_at_by_user(repo, start_date, end_date)
+    return {} unless @client
+
+    start_time = normalize_time(start_date)
+    end_time = normalize_time(end_date)
+
+    cache_fetch(
+      "last_commit_at_by_user",
+      repo,
+      start_time&.iso8601,
+      end_time&.iso8601,
+      expires_in: 10.minutes
+    ) do
+      commits = commits_in_range(repo, start_time, end_time)
+      last_commit_map = {}
+
+      commits.each do |commit|
+        username = commit.author&.login || commit.commit&.author&.name
+        next if username.blank?
+
+        committed_at = safe_parse_time(commit.commit&.author&.date || commit.commit&.committer&.date)
+        next if committed_at.blank?
+
+        previous = last_commit_map[username]
+        last_commit_map[username] = committed_at if previous.blank? || committed_at > previous
+      end
+
+      last_commit_map.transform_values(&:iso8601)
+    end
+  rescue StandardError => e
+    @logger.error("Last commit aggregate query failed for #{repo}: #{e.class} - #{e.message}")
+    {}
+  end
+
   # CBP: Count of commits and line changes
   def get_commit_info(repo, username, start_date, end_date)
     return CBPResult.new(0, 0, 0, 0) unless @client

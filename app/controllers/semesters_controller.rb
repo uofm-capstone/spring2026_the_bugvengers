@@ -1055,6 +1055,7 @@ end
     end_date = sprint.end_date || Date.current.end_of_month
 
     cbp_by_user = team_service.commit_metrics_by_user(repo, start_date, end_date)
+    last_commit_at_by_user = team_service.last_commit_at_by_user(repo, start_date, end_date)
     pr_by_user = team_service.pr_metrics_by_user(repo, start_date, end_date)
     review_by_user = team_service.review_metrics_by_user(repo, start_date, end_date)
 
@@ -1070,6 +1071,7 @@ end
       per_student[username] = {
         data_available: true,
         missing_data_flags: [],
+        last_commit_at: last_commit_at_by_user[username],
         cbp: {
           commit_count: cbp.commit_count,
           lines_added: cbp.lines_added,
@@ -1124,6 +1126,7 @@ end
     {
       data_available: !!data_available,
       missing_data_flags: Array(missing_data_flags),
+      last_commit_at: nil,
       cbp: { commit_count: 0, lines_added: 0, lines_removed: 0, lines_changed: 0 },
       pr: { opened_count: 0, merged_count: 0, open_count: 0, avg_merge_hours: 0.0 },
       review: { review_count: 0, approvals: 0, changes_requested: 0 }

@@ -1135,7 +1135,6 @@ end
 
     cbp_by_user = team_service.commit_metrics_by_user(repo, start_date, end_date)
     last_commit_at_by_user = team_service.last_commit_at_by_user(repo, start_date, end_date)
-    overall_last_commit_at_by_user = team_service.last_commit_at_by_user(repo, nil, nil)
     pr_by_user = team_service.pr_metrics_by_user(repo, start_date, end_date)
     review_by_user = team_service.review_metrics_by_user(repo, start_date, end_date)
 
@@ -1151,7 +1150,7 @@ end
       per_student[username] = {
         data_available: true,
         missing_data_flags: [],
-        last_commit_at: last_commit_at_by_user[username] || overall_last_commit_at_by_user[username],
+        last_commit_at: last_commit_at_by_user[username],
         cbp: {
           commit_count: cbp.commit_count,
           lines_added: cbp.lines_added,

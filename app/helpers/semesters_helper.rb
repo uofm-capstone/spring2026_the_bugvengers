@@ -85,11 +85,10 @@ module SemestersHelper
     timestamp = payload[:at].presence || metric[:last_commit_at].presence
 
     return "No GitHub username" if flags.include?("no_github_username")
+    return format_last_commit_timestamp(timestamp) if timestamp.present?
 
     unavailable_flags = %w[repo_missing token_unavailable github_query_failed github_query_timeout github_student_data_unavailable]
     return "GitHub data unavailable" if data_available == false || (flags & unavailable_flags).any?
-
-    return format_last_commit_timestamp(timestamp) if timestamp.present?
 
     "No commits in sprint"
   end

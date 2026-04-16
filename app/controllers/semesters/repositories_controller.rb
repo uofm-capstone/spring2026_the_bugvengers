@@ -13,14 +13,20 @@ class RepositoriesController < ApplicationController
         @semester = Semester.find(params[:semester_id])
         @repo = Repository.find(params[:id])
         @sprint = @semester.sprints.find_by(name: params[:sprint])
-        # @sprint = Sprint.find(params[:sprint_id])
-        # hard code sprint dates as the Sprint model is not defined / not used
-        @start_date = Date.new(2025, 1, 1)  # January 1, 2025
-        @end_date = Date.new(2025, 3, 1)    # March 1, 2025
+        @start_date = @sprint&.start_date || Date.current.beginning_of_month
+        @end_date = @sprint&.end_date || Date.current.end_of_month
 
 
         session[:repo_id] = params[:repo_id]
         session[:repo_sprint_id] = params[:sprint_id]
+
+        repository_team = @repo.team if @repo.respond_to?(:team)
+        token = GithubService.resolve_token(team: repository_team, user: current_user)
+        if token.blank?
+            return redirect_to semesters_path, alert: "Please add a valid GitHub API key"
+        end
+
+        headers = { "Authorization" => "Bearer #{token}", "Accept" => "application/json" }
 
         #Setting up the URLs for API calls. This uses GitHub's REST API v3. https://docs.github.com/en/rest
         issues_url="https://api.github.com/repos/#{@repo.owner}/#{@repo.repo_name}/issues?state=all"
@@ -28,11 +34,10 @@ class RepositoriesController < ApplicationController
         pullrequest_reviews_url="https://api.github.com/repos/#{@repo.owner}/#{@repo.repo_name}/pulls/"
         commits_url="https://api.github.com/repos/#{@repo.owner}/#{@repo.repo_name}/commits?per_page=100&since=#{@start_date}&until=#{@end_date}"
         contributors_url="https://api.github.com/repos/#{@repo.owner}/#{@repo.repo_name}/contributors"
-        if current_user.github_token
-        then
+        if token.present?
             #Need to have authorization token. This is where the GitHub API key is needed.
             #Response is stored in a variable
-            contributors_request = HTTParty.get(contributors_url,:headers => {"Authorization" => "Bearer #{current_user.github_token}","Accept" => "application/json"})
+            contributors_request = HTTParty.get(contributors_url,:headers => headers)
 
             #Use the JSON parse command to create an array (or hash?) based on the JSON response from the API
             begin
@@ -40,6 +45,7 @@ class RepositoriesController < ApplicationController
             rescue => exception
                 @contributors_array = "Could not retrieve list of contributors. This repository may not have any contributors yet."
             end
+            has_access = true
             begin
                 @contrib = []
                 @contributors_array.each do |issue|
@@ -53,7 +59,7 @@ class RepositoriesController < ApplicationController
                 redirect_to session.delete(:return_to), alert: "This repo is set to private, Please be given access and generate a token to use the GIT API"
             else
                 # Uncomment to get issues list from API. There is not currently any processing of issues on show page. Note that API issue requests cannot be filtered by date, but you could do some parsing of the results to keep the ones created/updated/closed since a certain time, etc.
-                issues_request = HTTParty.get(issues_url,:headers => {"Authorization" => "Bearer #{current_user.github_token}","Accept" => "application/json"})
+                issues_request = HTTParty.get(issues_url,:headers => headers)
                 @issues_hash = JSON.parse(issues_request.body)
                 @issue_titles = []
                 @issue_created = []
@@ -77,7 +83,7 @@ class RepositoriesController < ApplicationController
                     @issue_login.push(user[%Q(login)])
                 end
 
-                pullrequests_request = HTTParty.get(pullrequests_url,:headers => {"Authorization" => "Bearer #{current_user.github_token}","Accept" => "application/json"})
+                pullrequests_request = HTTParty.get(pullrequests_url,:headers => headers)
                 #Don't remember why I named some hashes and some arrays
                 pullrequests_api_results = JSON.parse(pullrequests_request.body)
                 @pr_review_array = []
@@ -87,13 +93,13 @@ class RepositoriesController < ApplicationController
                 #This only keeps PRs that have actually been merged.
                 pullrequests_api_results.each do |pr|
                     if pr[%Q(merged_at)] && Time.parse(pr[%Q(merged_at)]) > @start_date && Time.parse(pr[%Q(merged_at)]) < @end_date
-                        review_request = (HTTParty.get(pullrequest_reviews_url + "#{pr[%Q(number)]}/reviews",:headers => {"Authorization" => "Bearer #{current_user.github_token}","Accept" => "application/json"}))
+                        review_request = (HTTParty.get(pullrequest_reviews_url + "#{pr[%Q(number)]}/reviews",:headers => headers))
                         @pr_review_array.push(JSON.parse(review_request.body))
                         @pr_assigned_array.push(pr)
                         @pullrequests_review.push(pr[%Q(requested_reviewers)])
                     end
                 end
-                commits_request = HTTParty.get(commits_url,:headers => {"Authorization" => "Bearer #{current_user.github_token}","Accept" => "application/json"})
+                commits_request = HTTParty.get(commits_url,:headers => headers)
                 @commits_array = JSON.parse(commits_request.body)
             end
 

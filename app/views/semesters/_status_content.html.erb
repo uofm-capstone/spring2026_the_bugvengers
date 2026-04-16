@@ -1,0 +1,31 @@
+<%= turbo_frame_tag "semester-status-content" do %>
+  <div data-status-content-ready="1" class="d-none" aria-hidden="true"></div>
+  <div class="row semesters-status__content-row">
+    <div class="text-center semesters-status__content">
+      <% if team_exist(@teams) %>
+
+      <%= render "semesters/status_filters", sprint_list: @sprint_list %>
+      <% if @show_github_inspector %>
+        <%= render "semesters/github_data_inspector", teams: @teams, github_inspector: @github_inspector %>
+      <% end %>
+
+      <%= render "semesters/status_metrics_table",
+        sprint_list: @sprint_list,
+        teams: @teams,
+        team_overview_by_id: @team_overview_by_id,
+        semester: @semester,
+        team_sprint_metrics: @team_sprint_metrics,
+        status_metrics: @status_metrics %>
+      <div id="sponsor-modals-container">
+        <%= render "semesters/sponsor_response_modals" %>
+      </div>
+
+      <% else %>
+        <h2>Team Status</h2>
+        <div class="alert alert-warning" role="status">
+          No teams found for this semester, so status metrics cannot be displayed yet.
+        </div>
+      <% end %>
+    </div>
+  </div>
+<% end %>

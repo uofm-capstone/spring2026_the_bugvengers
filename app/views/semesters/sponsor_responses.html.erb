@@ -1,0 +1,57 @@
+<%= render "shared/page_header",
+  title: "Sponsor Responses",
+  subtitle: @semester.name_for_select,
+  actions: link_to("Back to Semester", semester_path(@semester), class: "btn btn-outline-secondary") %>
+
+<div class="container mt-3">
+  <% if @sponsor_csv_attached %>
+    <div class="alert alert-success" role="alert">
+      Sponsor CSV is attached. Parsed responses: <strong><%= @sponsor_rows_count %></strong>.
+    </div>
+  <% else %>
+    <div class="alert alert-warning" role="alert">
+      No sponsor CSV uploaded yet. Upload one below to enable summary and detailed view.
+    </div>
+  <% end %>
+
+  <article class="ui-card mb-4">
+    <div class="ui-card__body">
+      <h3 class="mb-3">Upload Sponsor CSV</h3>
+      <%= form_with url: upload_sponsor_csv_semester_path(@semester), method: :post, local: true, html: { multipart: true } do %>
+        <div class="row g-2 align-items-center">
+          <div class="col-md-9">
+            <%= file_field_tag :sponsor_csv, accept: ".csv", class: "form-control" %>
+          </div>
+          <div class="col-md-3">
+            <%= submit_tag "Upload CSV", class: "btn btn-ui-primary w-100" %>
+          </div>
+        </div>
+      <% end %>
+    </div>
+  </article>
+
+  <div class="d-flex gap-2 flex-wrap">
+    <button type="button" class="btn btn-ui-primary" data-bs-toggle="modal" data-bs-target="#sponsorSummaryModal">
+      Show Summary
+    </button>
+
+    <%= link_to "Show More", semester_sponsor_response_details_path(@semester), class: "btn btn-outline-primary" %>
+  </div>
+</div>
+
+<div class="modal fade" id="sponsorSummaryModal" tabindex="-1" aria-labelledby="sponsorSummaryModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="sponsorSummaryModalLabel">LLM Summary</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p class="mb-0"><%= @sponsor_summary_text %></p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,48 @@
+<%= render "shared/page_header",
+  title: "Sponsor Response Details",
+  subtitle: @semester.name_for_select,
+  actions: link_to("Back to Sponsor Upload", semester_sponsor_responses_path(@semester), class: "btn btn-outline-secondary") %>
+
+<div class="container mt-3">
+  <% unless @sponsor_csv_attached %>
+    <div class="alert alert-warning" role="alert">
+      No sponsor CSV uploaded yet. Please upload a CSV first.
+    </div>
+  <% else %>
+    <% if @sponsor_details.blank? %>
+      <div class="alert alert-info" role="alert">
+        Sponsor CSV is attached, but there are no detail rows to display.
+      </div>
+    <% else %>
+      <% @sponsor_details.each_with_index do |entry, index| %>
+        <article class="ui-card mb-3">
+          <div class="ui-card__body">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <h4 class="mb-0">Response <%= index + 1 %></h4>
+              <small class="text-muted"><strong>Team:</strong> <%= entry[:team] %> | <strong>Sprint:</strong> <%= entry[:sprint] %></small>
+            </div>
+
+            <div class="table-responsive">
+              <table class="table table-bordered align-middle mb-0">
+                <thead>
+                  <tr>
+                    <th style="width: 45%;">Question</th>
+                    <th>Answer</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <% entry[:responses].each do |response| %>
+                    <tr>
+                      <td><%= response[:question] %></td>
+                      <td><%= response[:answer] %></td>
+                    </tr>
+                  <% end %>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </article>
+      <% end %>
+    <% end %>
+  <% end %>
+</div>

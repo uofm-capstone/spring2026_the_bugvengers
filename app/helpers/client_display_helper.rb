@@ -65,33 +65,24 @@ module ClientDisplayHelper
 
       begin
         semester.client_csv.open do |tempClient|
-          client_data_raw = SmarterCSV.process(tempClient.path)
-          full_questions = extract_full_questions(tempClient.path)
+          # Centralized parser returns both grouped LLM payload and helper-friendly normalized rows.
+          parsed = CSVSurveyParserService.new(file: tempClient).parse
+          flags.append("client csv error") if parsed[:errors].present?
 
-          @client_question_titles = client_data_raw[0].select { |key, _| key.to_s.start_with?('q') }
+          client_data_raw = parsed[:rows]
+          # q2_* prompt labels are extracted from the second CSV row by the service.
+          full_questions = parsed[:full_questions]
 
+          # Used by helper/view rendering to map q* keys to visible question labels.
+          @client_question_titles = client_data_raw[0]&.select { |key, _| key.to_s.start_with?('q') } || {}
 
-          max_similarity = 0
-          best_matching_team = nil
-
-          client_data_raw.each do |client_survey|
-
-            next if client_survey[:q1_team].blank? || client_survey[:q1_team].start_with?('{')
-            next if client_survey[:q3].blank?
-
-            similarities = compare_strings(team, client_survey[:q1_team])
-            avg_similarity = (similarities[:jaro_winkler] + similarities[:levenshtein]) / 2.0
-
-            if avg_similarity > max_similarity
-              max_similarity = avg_similarity
-              best_matching_team = client_survey[:q1_team]
-            end
-          end
-
-          cliSurvey = client_data_raw.find_all { |survey| survey[:q1_team] == best_matching_team && survey[:q3] == sprint }
+          # Preserve prior behavior: select one best-matching team within the requested sprint.
+          # Match team name fuzzily because user-facing team names may not exactly match CSV text.
+          cliSurvey = best_matching_team_rows(client_rows: client_data_raw, team: team, sprint: sprint)
           cliSurvey.map! { |survey| survey.select { |key, _| key.to_s.start_with?('q') } }
 
 
+          # Flag feeds warning banners in team/status pages.
           if cliSurvey.blank?
             flags.append("client blank")
           end
@@ -109,17 +100,38 @@ module ClientDisplayHelper
       [client_data, flags]
     end
 
-    private
+    # Shared matcher used by both team page rendering and semester status flags.
+    # It narrows rows by sprint, then chooses the closest team name match.
+    def best_matching_team_rows(client_rows:, team:, sprint:)
+      # Step 1: restrict comparison to the target sprint.
+      sprint_rows = client_rows.select do |row|
+        row[:q3].to_s.strip.casecmp?(sprint.to_s.strip)
+      end
+      return [] if sprint_rows.blank?
 
-    #helps display the questions from the second roll in the CSV
-    def extract_full_questions(csv_path)
-      csv = CSV.read(csv_path, headers: true)
-      question_headers = csv.headers.grep(/\Aq2_\d+\z/i)
-      full_questions = csv[0].values_at(*question_headers)
-      Hash[question_headers.zip(full_questions)]
+      best_matching_team = nil
+      max_similarity = 0.0
+
+      # Step 2: choose the best team name match using averaged string similarity metrics.
+      sprint_rows.each do |client_survey|
+        next if client_survey[:q1_team].blank? || client_survey[:q1_team].start_with?('{')
+
+        similarities = compare_strings(team.to_s, client_survey[:q1_team].to_s)
+        avg_similarity = (similarities[:jaro_winkler].to_f + similarities[:levenshtein].to_f) / 2.0
+
+        if avg_similarity > max_similarity
+          max_similarity = avg_similarity
+          best_matching_team = client_survey[:q1_team]
+        end
+      end
+
+      # Step 3: return all rows for that best-matching team in the sprint.
+      return [] if best_matching_team.blank?
+
+      sprint_rows.select { |survey| survey[:q1_team] == best_matching_team }
     end
 
-
+    private
 
 
 end

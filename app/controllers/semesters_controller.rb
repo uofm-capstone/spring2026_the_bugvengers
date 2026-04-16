@@ -1132,9 +1132,12 @@ end
 
     start_date = sprint.start_date || Date.current.beginning_of_month
     end_date = sprint.end_date || Date.current.end_of_month
+    fallback_end_date = end_date.respond_to?(:to_date) ? end_date.to_date : Date.current
+    fallback_start_date = fallback_end_date - 180.days
 
     cbp_by_user = team_service.commit_metrics_by_user(repo, start_date, end_date)
     last_commit_at_by_user = team_service.last_commit_at_by_user(repo, start_date, end_date)
+    fallback_last_commit_at_by_user = team_service.last_commit_at_by_user(repo, fallback_start_date, fallback_end_date)
     pr_by_user = team_service.pr_metrics_by_user(repo, start_date, end_date)
     review_by_user = team_service.review_metrics_by_user(repo, start_date, end_date)
 
@@ -1143,14 +1146,16 @@ end
       username = student.github_username.to_s
       next if username.blank?
 
-      cbp = cbp_by_user[username] || GithubService::CBPResult.new(0, 0, 0, 0)
-      pr = pr_by_user[username] || GithubService::PRResult.new(0, 0, 0, 0)
-      review = review_by_user[username] || GithubService::ReviewResult.new(0, 0, 0)
+      cbp = lookup_user_metric(cbp_by_user, username) || GithubService::CBPResult.new(0, 0, 0, 0)
+      pr = lookup_user_metric(pr_by_user, username) || GithubService::PRResult.new(0, 0, 0, 0)
+      review = lookup_user_metric(review_by_user, username) || GithubService::ReviewResult.new(0, 0, 0)
+      last_commit_at = lookup_user_metric(last_commit_at_by_user, username) ||
+                       lookup_user_metric(fallback_last_commit_at_by_user, username)
 
       per_student[username] = {
         data_available: true,
         missing_data_flags: [],
-        last_commit_at: last_commit_at_by_user[username],
+        last_commit_at: last_commit_at,
         cbp: {
           commit_count: cbp.commit_count,
           lines_added: cbp.lines_added,
@@ -1199,6 +1204,25 @@ end
     }
   rescue StandardError
     empty_team_github_metrics(repo: repo, missing_data_flags: ["github_query_failed"])
+  end
+
+  def lookup_user_metric(metrics, username)
+    return nil if metrics.blank? || username.blank?
+
+    return metrics[username] if metrics.key?(username)
+
+    normalized_target = normalized_github_username(username)
+    return nil if normalized_target.blank?
+
+    metrics.each do |key, value|
+      return value if normalized_github_username(key) == normalized_target
+    end
+
+    nil
+  end
+
+  def normalized_github_username(value)
+    value.to_s.strip.sub(/\A@/, "").downcase
   end
 
   def empty_student_github_metrics(missing_data_flags: ["repo_or_token_missing"], data_available: false)
@@ -1401,14 +1425,24 @@ end
     matching_cards = cards.select { |card| card_matches_sprint?(card, sprint) }
     return matching_cards if matching_cards.any?
 
-    return [] unless sprint_in_progress?(sprint)
+    return [] unless sprint_in_progress?(sprint) || latest_sprint_in_semester?(sprint)
 
-    # Fallback only for the active sprint when cards are not explicitly tagged.
-    # This prevents Sprint 4 from inheriting Sprint 3 values.
+    # Fallback for active/latest sprint when cards are not explicitly tagged.
+    # Older sprints still require explicit sprint tagging.
     cards.select do |card|
       status = card.status.to_s
       %w[Backlog Todo To\ Do In\ Progress Done].include?(status)
     end
+  end
+
+  def latest_sprint_in_semester?(sprint)
+    return false if sprint.blank? || @sprints.blank?
+
+    current_number = sprint.name.to_s[/\d+/].to_i
+    sprint_numbers = @sprints.map { |item| item.name.to_s[/\d+/].to_i }.select(&:positive?)
+    return current_number == sprint_numbers.max if current_number.positive? && sprint_numbers.any?
+
+    @sprints.last == sprint
   end
 
   def card_matches_sprint?(card, sprint)

@@ -1,6 +1,6 @@
 <!-- TABLE -->
 <div class="table-responsive team-status-table-wrap">
-  <% rubric_items = ["FS&D", "FA", "TE", "TT", "KU", "PP"] %>
+  <% rubric_items = ["FS&D", "FA", "TE", "TT", "Last Commit", "PP"] %>
   <% sponsor_columns = [
     { sprint: "Sprint 2", label: "Sponsor Response - Sprint 2", css: "sprint-2" },
     { sprint: "Sprint 3", label: "Sponsor Response - Sprint 3", css: "sprint-3" },
@@ -27,7 +27,7 @@
               when "FA"   then "<strong>Feature Assignments</strong><br><b>Metric:</b> Number of cards assigned to this student in this sprint."
               when "TE"   then "<strong>Time Estimate</strong><br><b>Metric:</b> Estimated hours for this student's sprint cards."
               when "TT"   then "<strong>Time Taken</strong><br><b>Metric:</b> Logged hours from Kanban Time Taken / Time Spent fields for this student's sprint cards."
-              when "KU"   then "<strong>Kanban Updates (KU)</strong><br><b>What it measures:</b> How well completed work is documented on the Kanban board.<br><b>Formula (0-100):</b><br>KU = 20 base + 40% TE completeness + 40% TT completeness<br><b>Base 20:</b> Team has at least 1 done card (student row: student has at least 1 assigned card).<br><b>TE completeness:</b> % of done cards with Time Estimate > 0.<br><b>TT completeness:</b> % of done cards with Time Taken/Spent > 0.<br><b>Done cards include:</b> Done, Archived, and Done in Sprint X.<br><b>Bands:</b> Healthy >= 85, Watch >= 70, At Risk < 70."
+              when "Last Commit" then "<strong>Last Commit</strong><br><b>Metric:</b> Shows the latest GitHub commit timestamp available for this student in this sprint view.<br><b>Note:</b> Informational recency signal only; not a formula-based score."
               when "PP"   then "<strong>Product Progress</strong><br><b>Metric:</b> Done ratio for sprint cards in scope, with completion band."
               else "<strong>Metric</strong><br><b>Metric:</b> Description unavailable."
             end %>
@@ -89,26 +89,8 @@
                       <%= metric.dig(:te, :estimated_hours) || 0 %>
                     <% when "TT" %>
                       <%= metric.dig(:ts, :time_spent_hours) || 0 %>
-                    <% when "KU" %>
-                      <% ku_metric = metric[:ku] || {} %>
-                      <% github_metric = metric[:github] || {} %>
-                      <div class="github-score-cell">
-                        <% if ku_metric[:band] != "No Data" %>
-                          <span class="github-score-badge <%= github_score_state_class(ku_metric[:score]) %>">
-                            <%= ku_metric[:score] || 0 %>%
-                          </span>
-                          <span class="github-band"><%= ku_metric[:band] || "No Data" %></span>
-                        <% else %>
-                          <span class="github-score-badge is-watch">N/A</span>
-                          <span class="github-band">No Data</span>
-                        <% end %>
-                        <div class="github-score-chips">
-                          <span class="github-chip" data-bs-toggle="tooltip" data-bs-placement="top" title="<%= github_chip_tooltip('GH') %>">GH <%= compact_score(github_metric[:score]) %></span>
-                          <span class="github-chip" data-bs-toggle="tooltip" data-bs-placement="top" title="<%= github_chip_tooltip('CBP') %>">CBP <%= compact_score(github_metric[:cbp_score]) %></span>
-                          <span class="github-chip" data-bs-toggle="tooltip" data-bs-placement="top" title="<%= github_chip_tooltip('PR') %>">PR <%= compact_score(github_metric[:pr_score]) %></span>
-                          <span class="github-chip" data-bs-toggle="tooltip" data-bs-placement="top" title="<%= github_chip_tooltip('RVW') %>">RVW <%= compact_score(github_metric[:review_score]) %></span>
-                        </div>
-                      </div>
+                    <% when "Last Commit" %>
+                      <span class="github-band"><%= formatted_last_commit_display(metric) %></span>
                     <% when "PP" %>
                       <% done_count = metric.dig(:fsd, :done).to_i %>
                       <% total_count = metric.dig(:fa, :assigned_cards).to_i %>
@@ -178,25 +160,8 @@
                     <strong><%= team_metric[:estimated_hours] || 0 %></strong>
                   <% when "TT" %>
                     <strong><%= team_metric[:time_spent_hours] || 0 %></strong>
-                  <% when "KU" %>
-                    <% github_metric = team_metric[:github] || {} %>
-                    <div class="github-score-cell">
-                      <% if team_metric[:ku_band] != "No Data" %>
-                        <strong class="github-score-badge <%= github_score_state_class(team_metric[:ku_score]) %>">
-                          <%= team_metric[:ku_score] || 0 %>%
-                        </strong>
-                        <span class="github-band"><%= team_metric[:ku_band] || "No Data" %></span>
-                      <% else %>
-                        <strong class="github-score-badge is-watch">N/A</strong>
-                        <span class="github-band">No Data</span>
-                      <% end %>
-                      <div class="github-score-chips">
-                        <span class="github-chip" data-bs-toggle="tooltip" data-bs-placement="top" title="<%= github_chip_tooltip('GH') %>">GH <%= compact_score(github_metric[:score]) %></span>
-                        <span class="github-chip" data-bs-toggle="tooltip" data-bs-placement="top" title="<%= github_chip_tooltip('CBP') %>">CBP <%= compact_score(github_metric[:cbp_score]) %></span>
-                        <span class="github-chip" data-bs-toggle="tooltip" data-bs-placement="top" title="<%= github_chip_tooltip('PR') %>">PR <%= compact_score(github_metric[:pr_score]) %></span>
-                        <span class="github-chip" data-bs-toggle="tooltip" data-bs-placement="top" title="<%= github_chip_tooltip('RVW') %>">RVW <%= compact_score(github_metric[:review_score]) %></span>
-                      </div>
-                    </div>
+                  <% when "Last Commit" %>
+                    <strong class="github-band"><%= team_last_commit_summary(team: team, sprint: sprint, status_metrics: status_metrics) %></strong>
                   <% when "PP" %>
                     <strong><%= team_metric[:pp_completion_pct] || 0 %>% (<%= team_metric[:pp_band] || "No Data" %>)</strong>
                     <div class="github-band"><%= team_metric[:done_cards].to_i %>/<%= team_metric[:total_cards].to_i %> done</div>

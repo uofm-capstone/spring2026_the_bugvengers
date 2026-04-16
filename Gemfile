@@ -104,4 +104,4 @@ gem 'fuzzy-string-match'
 
 gem 'cancancan'
 
-gem 'sendgrid-ruby'
+gem 'mailjet'

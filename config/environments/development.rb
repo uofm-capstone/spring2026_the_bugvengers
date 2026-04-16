@@ -74,11 +74,11 @@ Rails.application.configure do
   config.action_mailer.perform_deliveries    = true
   config.action_mailer.default_url_options   = { host: "127.0.0.1", port: 8080 }
   config.action_mailer.smtp_settings = {
-    address:              "smtp.sendgrid.net",
+    address:              "in-v3.mailjet.com",
     port:                 587,
     domain:               "127.0.0.1",
-    user_name:            "apikey",
-    password:             ENV["SENDGRID_API_KEY"],
+    user_name:            ENV["MAILJET_API_KEY"],
+    password:             ENV["MAILJET_SECRET_KEY"],
     authentication:       :plain,
     enable_starttls_auto: true
   }

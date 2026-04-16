@@ -105,3 +105,6 @@ gem 'fuzzy-string-match'
 gem 'cancancan'
 
 gem 'sendgrid-ruby'
+
+gem 'chartkick'
+gem 'groupdate'

@@ -23,6 +23,10 @@ class AdminController < ApplicationController
       students: @users.count(&:student?),
       semesters: @semesters.size
     }
+    @login_counts = LoginLog
+      .where("logged_in_at >= ?", 7.days.ago)
+      .group_by_day(:logged_in_at, last: 7)
+      .count
   end
 
   def check_ta_or_admin

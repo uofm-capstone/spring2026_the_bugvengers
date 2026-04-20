@@ -45,7 +45,7 @@ steps:
 
       # Rails env
       - "--set-env-vars"
-      - "RAILS_ENV=production,RAILS_SERVE_STATIC_FILES=true,LLM_API_URL=http://10.128.0.2:11434"
+      - "RAILS_ENV=production,RAILS_SERVE_STATIC_FILES=true,LLM_API_URL=http://10.128.0.7:11434"
 
       # Secrets (must exist in this project)
       - "--set-secrets"

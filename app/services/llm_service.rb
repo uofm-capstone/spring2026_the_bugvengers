@@ -13,8 +13,8 @@ require "active_support/core_ext/string/filters"
 # returns a safe, structured result that never raises to callers.
 class LlmService
   # Reasonable defaults for local VM-hosted Ollama usage.
-  DEFAULT_MODEL = "gemma:2b"
-  DEFAULT_TIMEOUT_SECONDS = 20
+  DEFAULT_MODEL = "gemma4:e2b"
+  DEFAULT_TIMEOUT_SECONDS = 180
   ERROR_DETAIL_LIMIT = 300
   GENERATE_PATH = "/api/generate"
   CHAT_PATH = "/api/chat"

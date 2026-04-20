@@ -115,9 +115,16 @@ class SponsorSummaryService
     # Upload should still succeed when LLM fails; controller can show warning
     # while preserving stored CSV data for teams and instructors.
     unless llm_result[:ok]
+      llm_error_code = llm_result.dig(:error, :code).to_s.strip
+      llm_error_message = llm_result.dig(:error, :message).to_s.strip
+      diagnostic_suffix = [llm_error_code.presence, llm_error_message.presence].compact.join(" - ")
+      diagnostic_suffix = "unknown_llm_error" if diagnostic_suffix.blank?
+
+      # Include diagnostic details so upload warning text can immediately point
+      # maintainers toward config vs network vs model-tag issues.
       return failure_result(
         error_code: "llm_error",
-        message: "CSV upload succeeded, but summary generation could not be completed.",
+        message: "CSV upload succeeded, but summary generation could not be completed (#{diagnostic_suffix}).",
         rows_count: rows_count
       )
     end
@@ -182,7 +189,7 @@ class SponsorSummaryService
   def build_llm_service
     return @llm_service_builder.call if @llm_service_builder.respond_to?(:call)
 
-    LlmService.new(include_scale_summary: true, timeout_seconds: 120)
+    LlmService.new(include_scale_summary: true)
   end
 
   # All failures intentionally return the same summary shape consumed by UI.

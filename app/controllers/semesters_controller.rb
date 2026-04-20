@@ -429,7 +429,11 @@ end
           # Keep upload successful even when LLM fails so teams do not lose CSV data.
           # The fallback summary gives immediate UI feedback and can be overwritten
           # by a future re-upload once the LLM endpoint is healthy.
-          message = "#{sprint_label} sponsor CSV uploaded, but summary generation had a warning: #{summary_result[:message]}"
+          warning_detail = summary_result[:message].to_s.strip
+          warning_detail = "Summary generation could not be completed." if warning_detail.blank?
+          warning_detail = warning_detail.sub(/\ACSV upload succeeded,\s*/i, "")
+          warning_detail = warning_detail.sub(/\Asummary generation\s*/i, "Summary generation ")
+          message = "#{sprint_label} sponsor CSV uploaded. #{warning_detail}"
         end
       end
     else
@@ -792,7 +796,11 @@ end
     sponsor_sources.each do |sprint_label, attachment|
       override_summary = @sponsor_summary_overrides&.[](sprint_label)
 
-      @sponsor_csv_attached[sprint_label] = attachment.attached?
+      # UI guardrail: treat a sprint as "ready" only when the attachment exists
+      # and can be parsed successfully. This prevents stale ActiveStorage metadata
+      # (common in ephemeral deploy environments) from showing Summary/Questions
+      # controls when the underlying file is missing.
+      @sponsor_csv_attached[sprint_label] = false
       @sponsor_rows_count[sprint_label] = 0
       @sponsor_summary_text[sprint_label] = "Upload a sponsor CSV for #{sprint_label} to view summary and detailed questions."
       @sponsor_details[sprint_label] = []
@@ -803,9 +811,12 @@ end
       @sponsor_rows_count[sprint_label] = parsed[:rows].size
 
       if parsed[:errors].present?
-        @sponsor_summary_text[sprint_label] = "#{sprint_label} sponsor CSV is attached, but parsing failed. Please verify CSV format and try again."
+        # Keep upload controls in "Upload CSV first" state when parse fails,
+        # because actionable summary/details are not available yet.
         next
       end
+
+      @sponsor_csv_attached[sprint_label] = true
 
       # Summary display precedence:
       # 1) upload-time override for this request (typically LLM warning fallback)

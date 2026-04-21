@@ -113,12 +113,9 @@ Rails.application.configure do
     protocol: "https"
   }
   config.action_mailer.smtp_settings = {
-    #address:              "in-v3.mailjet.com",
     address:              "smtp.sendgrid.net",
     port:                 587,
     domain:               "tag-app-service-1081269285897.us-central1.run.app",
-    #user_name:            ENV["MAILJET_API_KEY"],
-    #password:             ENV["MAILJET_SECRET_KEY"],
     user_name:            "apikey",
     password:             ENV["SENDGRID_API_KEY"],
     authentication:       :plain,

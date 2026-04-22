@@ -10,6 +10,7 @@
 # Ensures users are created only if they do not already exist
 User.find_or_create_by(email: "email@email.com") do |user|
   user.password = "123456"
+  user.is_active = true
   user.temp_password_changed = true
 end
 
@@ -18,6 +19,7 @@ User.find_or_create_by(email: "AmyCook@admin.com") do |user|
   user.password = "Admin123!"
   user.admin = true
   user.role = :admin
+  user.is_active = true
   user.temp_password_changed = true
 end
 
@@ -26,6 +28,7 @@ User.find_or_create_by(email: "BrandonBooth@admin.com") do |user|
   user.password = "Admin456!"
   user.admin = true
   user.role = :admin
+  user.is_active = true
   user.temp_password_changed = true
 end
 
@@ -34,6 +37,7 @@ User.find_or_create_by(email: "Dmdowdy@memphis.edu") do |user|
   user.password = "Admin789!"
   user.admin = true
   user.role = :admin
+  user.is_active = true
   user.temp_password_changed = true
 end
 
@@ -43,12 +47,14 @@ end
 User.find_or_create_by(email: "doe.john@ta.edu") do |user|
   user.password = "TApass123!"
   user.role = :ta
+  user.is_active = true
   user.temp_password_changed = true
 end
 
 User.find_or_create_by(email: "smith.jame@ta.edu") do |user|
   user.password = "TApass456!"
   user.role = :ta
+  user.is_active = true
   user.temp_password_changed = true
 end
 

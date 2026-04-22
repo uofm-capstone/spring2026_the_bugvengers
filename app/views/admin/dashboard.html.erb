@@ -44,6 +44,7 @@
           <th>Email</th>
           <th>Role</th>
           <th>Last Logged In</th>
+          <th>Activity Status</th>
           <th>Actions</th>
         </tr>
       </thead>
@@ -55,6 +56,13 @@
             <td><%= role_badge(user) %></td>
             <td>
               <%= user.last_login_at ? user.last_login_at.strftime("%Y-%m-%d %H:%M") : "Never" %>
+            </td>
+            <td>
+              <% if user.is_active %>
+                <span style="color: green; font-weight: bold;">✔</span>
+              <% else %>
+                <span style="color: red; font-weight: bold;">✖</span>
+              <% end %>
             </td>
             <td>
               <div class="admin-dashboard__actions">
@@ -90,4 +98,20 @@
       </tbody>
     </table>
   </div>
+</section>
+<p></p>
+<section class="admin-dashboard__chart-card ui-card__body mb-4">
+  <h3>Login Activity (Last 7 Days)</h3>
+  <%= column_chart @login_counts,
+  height: "300px",
+  colors: ["#2563eb"],
+  xtitle: "Date",
+  ytitle: "Logins",
+  library: {
+    plugins: {
+      legend: { display: false }},
+    scales: {
+      x: {grid: { display: false }},
+      y: {beginAtZero: true}}}
+  %>
 </section>

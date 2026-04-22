@@ -402,6 +402,7 @@ end
     sprint_label = "Sprint #{sprint_number}"
     sprint_key = "sprint-#{sprint_number}"
     attachment_name = sponsor_attachment_name_for_sprint(sprint_number)
+    summary_override_text = nil
     success = false
     message = nil
 
@@ -412,10 +413,36 @@ end
       attachment.attach(params[:sponsor_csv])
       success = attachment.attached?
       message = success ? "#{sprint_label} sponsor CSV uploaded successfully." : "#{sprint_label} sponsor CSV upload failed."
+
+      # Important behavior contract for the status page:
+      # run summary analysis only when the user explicitly uploads a CSV.
+      # We never trigger LLM analysis from page-load rendering paths.
+      if success
+        summary_result = generate_sponsor_summary(sprint_number: sprint_number)
+
+        # Without persistence, the current request must carry the generated
+        # summary into modal rendering. This applies to both success and
+        # fallback outputs so users always see immediate upload feedback.
+        summary_override_text = summary_result[:summary_text]
+
+        unless summary_result[:ok]
+          # Keep upload successful even when LLM fails so teams do not lose CSV data.
+          # The fallback summary gives immediate UI feedback and can be overwritten
+          # by a future re-upload once the LLM endpoint is healthy.
+          warning_detail = summary_result[:message].to_s.strip
+          warning_detail = "Summary generation could not be completed." if warning_detail.blank?
+          warning_detail = warning_detail.sub(/\ACSV upload succeeded,\s*/i, "")
+          warning_detail = warning_detail.sub(/\Asummary generation\s*/i, "Summary generation ")
+          message = "#{sprint_label} sponsor CSV uploaded. #{warning_detail}"
+        end
+      end
     else
       message = "Please choose a CSV file before uploading."
     end
 
+    # Upload response can include one-off summary text for this request only.
+    # This keeps summary rendering transient and avoids cross-page persistence.
+    @sponsor_summary_overrides = { sprint_label => summary_override_text }
     build_sponsor_ui_payload!
 
     respond_to do |format|
@@ -554,6 +581,20 @@ end
     end
   end
 
+  # Executes parse + LLM summary generation through SponsorSummaryService.
+  # Summary storage is handled separately in session-scoped cache helpers.
+  def generate_sponsor_summary(sprint_number:)
+    SponsorSummaryService.new(semester: @semester, sprint_number: sprint_number).generate
+  rescue StandardError => e
+    Rails.logger.error("Sponsor summary generation failed for semester #{@semester.id}: #{e.class} - #{e.message}")
+
+    {
+      ok: false,
+      summary_text: SponsorSummaryService::FALLBACK_SUMMARY_TEXT,
+      message: "Summary generation failed after upload."
+    }
+  end
+
   def build_sponsor_details(parsed:)
     rows = parsed[:rows] || []
     full_questions = parsed[:full_questions] || {}
@@ -561,9 +602,27 @@ end
 
     rows.map do |row|
       responses = detail_keys.map do |key|
-        question = full_questions[key.to_s].presence || key.to_s.upcase
-        answer = row[key].to_s.strip
-        { question: question, answer: answer.presence || "Not answered" }
+        # Prefer descriptive prompt text from parser map; keep resilient fallbacks
+        # for older CSV formats where prompt metadata may be incomplete.
+        question_key = key.to_s
+        question = full_questions[question_key].presence || full_questions[question_key.downcase].presence || key.to_s.upcase
+        raw_answer = row[key].to_s.strip
+        answer_text = raw_answer.presence || "Not answered"
+
+        # Qualtrics q2_* prompts are often shaped like:
+        # "Please evaluate ... - The team was on time ..."
+        # For table readability, keep the shared prompt in the Question column
+        # and move the statement-specific clause to the Answer column.
+        if question_key.match?(/\Aq2_\d+\z/i) && question.include?(" - ")
+          base_prompt, criterion = question.split(/\s+-\s+/, 2)
+
+          if base_prompt.present? && criterion.present?
+            question = base_prompt.strip
+            answer_text = "#{criterion.strip}: #{answer_text}"
+          end
+        end
+
+        { question: question, answer: answer_text }
       end
 
       {
@@ -735,7 +794,13 @@ end
     @sponsor_details = {}
 
     sponsor_sources.each do |sprint_label, attachment|
-      @sponsor_csv_attached[sprint_label] = attachment.attached?
+      override_summary = @sponsor_summary_overrides&.[](sprint_label)
+
+      # UI guardrail: treat a sprint as "ready" only when the attachment exists
+      # and can be parsed successfully. This prevents stale ActiveStorage metadata
+      # (common in ephemeral deploy environments) from showing Summary/Questions
+      # controls when the underlying file is missing.
+      @sponsor_csv_attached[sprint_label] = false
       @sponsor_rows_count[sprint_label] = 0
       @sponsor_summary_text[sprint_label] = "Upload a sponsor CSV for #{sprint_label} to view summary and detailed questions."
       @sponsor_details[sprint_label] = []
@@ -746,11 +811,22 @@ end
       @sponsor_rows_count[sprint_label] = parsed[:rows].size
 
       if parsed[:errors].present?
-        @sponsor_summary_text[sprint_label] = "#{sprint_label} sponsor CSV is attached, but parsing failed. Please verify CSV format and try again."
+        # Keep upload controls in "Upload CSV first" state when parse fails,
+        # because actionable summary/details are not available yet.
         next
       end
 
-      @sponsor_summary_text[sprint_label] = "Placeholder summary for #{sprint_label}: #{@sponsor_rows_count[sprint_label]} sponsor responses parsed. Backend AI summary output will appear here once connected."
+      @sponsor_csv_attached[sprint_label] = true
+
+      # Summary display precedence:
+      # 1) upload-time override for this request (typically LLM warning fallback)
+      # 2) explicit waiting message when a CSV exists but summary is not part
+      #    of the current request lifecycle.
+      @sponsor_summary_text[sprint_label] = if override_summary.present?
+                                              override_summary
+                                            else
+                                              "#{sprint_label} sponsor CSV uploaded. Summary has not been generated yet. Re-upload to retry analysis."
+                                            end
       @sponsor_details[sprint_label] = build_sponsor_details(parsed: parsed)
     end
   end
@@ -846,15 +922,22 @@ end
     student_pp_band = assigned_card_count.zero? ? "No Data" : pp_band_for(student_pp_completion_pct)
 
     if github_student_metrics.blank?
-      inferred_flags = Array(team_missing_data_flags).presence || ["github_student_data_unavailable"]
+      student_username_missing = student.github_username.to_s.strip.blank?
+      inferred_flags = if student_username_missing
+        ["no_github_username"]
+      else
+        Array(team_missing_data_flags).presence || ["github_student_data_unavailable"]
+      end
+
       github_student_metrics = empty_student_github_metrics(
         missing_data_flags: inferred_flags,
-        data_available: team_github_available
+        data_available: student_username_missing ? false : team_github_available
       )
     end
     cbp_data = github_student_metrics[:cbp] || {}
     pr_data = github_student_metrics[:pr] || {}
     review_data = github_student_metrics[:review] || {}
+    last_commit_at = github_student_metrics[:last_commit_at]
     missing_data_flags = Array(github_student_metrics[:missing_data_flags])
 
     cbp_score = score_cbp(
@@ -923,6 +1006,12 @@ end
       cbp: cbp_data,
       pr: pr_data,
       review: review_data,
+      last_commit_at: last_commit_at,
+      last_commit: {
+        at: last_commit_at,
+        data_available: github_student_metrics[:data_available],
+        missing_data_flags: missing_data_flags
+      },
       github: {
         score: github_score,
         band: github_band,
@@ -930,6 +1019,7 @@ end
         pr_score: pr_score,
         review_score: review_score,
         kanban_score: student_kanban_score,
+        last_commit_at: last_commit_at,
         data_available: github_student_metrics[:data_available],
         missing_data_flags: missing_data_flags
       }
@@ -1053,8 +1143,12 @@ end
 
     start_date = sprint.start_date || Date.current.beginning_of_month
     end_date = sprint.end_date || Date.current.end_of_month
+    fallback_end_date = end_date.respond_to?(:to_date) ? end_date.to_date : Date.current
+    fallback_start_date = fallback_end_date - 180.days
 
     cbp_by_user = team_service.commit_metrics_by_user(repo, start_date, end_date)
+    last_commit_at_by_user = team_service.last_commit_at_by_user(repo, start_date, end_date)
+    fallback_last_commit_at_by_user = team_service.last_commit_at_by_user(repo, fallback_start_date, fallback_end_date)
     pr_by_user = team_service.pr_metrics_by_user(repo, start_date, end_date)
     review_by_user = team_service.review_metrics_by_user(repo, start_date, end_date)
 
@@ -1063,13 +1157,16 @@ end
       username = student.github_username.to_s
       next if username.blank?
 
-      cbp = cbp_by_user[username] || GithubService::CBPResult.new(0, 0, 0, 0)
-      pr = pr_by_user[username] || GithubService::PRResult.new(0, 0, 0, 0)
-      review = review_by_user[username] || GithubService::ReviewResult.new(0, 0, 0)
+      cbp = lookup_user_metric(cbp_by_user, username) || GithubService::CBPResult.new(0, 0, 0, 0)
+      pr = lookup_user_metric(pr_by_user, username) || GithubService::PRResult.new(0, 0, 0, 0)
+      review = lookup_user_metric(review_by_user, username) || GithubService::ReviewResult.new(0, 0, 0)
+      last_commit_at = lookup_user_metric(last_commit_at_by_user, username) ||
+                       lookup_user_metric(fallback_last_commit_at_by_user, username)
 
       per_student[username] = {
         data_available: true,
         missing_data_flags: [],
+        last_commit_at: last_commit_at,
         cbp: {
           commit_count: cbp.commit_count,
           lines_added: cbp.lines_added,
@@ -1120,10 +1217,30 @@ end
     empty_team_github_metrics(repo: repo, missing_data_flags: ["github_query_failed"])
   end
 
+  def lookup_user_metric(metrics, username)
+    return nil if metrics.blank? || username.blank?
+
+    return metrics[username] if metrics.key?(username)
+
+    normalized_target = normalized_github_username(username)
+    return nil if normalized_target.blank?
+
+    metrics.each do |key, value|
+      return value if normalized_github_username(key) == normalized_target
+    end
+
+    nil
+  end
+
+  def normalized_github_username(value)
+    value.to_s.strip.sub(/\A@/, "").downcase
+  end
+
   def empty_student_github_metrics(missing_data_flags: ["repo_or_token_missing"], data_available: false)
     {
       data_available: !!data_available,
       missing_data_flags: Array(missing_data_flags),
+      last_commit_at: nil,
       cbp: { commit_count: 0, lines_added: 0, lines_removed: 0, lines_changed: 0 },
       pr: { opened_count: 0, merged_count: 0, open_count: 0, avg_merge_hours: 0.0 },
       review: { review_count: 0, approvals: 0, changes_requested: 0 }
@@ -1319,14 +1436,24 @@ end
     matching_cards = cards.select { |card| card_matches_sprint?(card, sprint) }
     return matching_cards if matching_cards.any?
 
-    return [] unless sprint_in_progress?(sprint)
+    return [] unless sprint_in_progress?(sprint) || latest_sprint_in_semester?(sprint)
 
-    # Fallback only for the active sprint when cards are not explicitly tagged.
-    # This prevents Sprint 4 from inheriting Sprint 3 values.
+    # Fallback for active/latest sprint when cards are not explicitly tagged.
+    # Older sprints still require explicit sprint tagging.
     cards.select do |card|
       status = card.status.to_s
       %w[Backlog Todo To\ Do In\ Progress Done].include?(status)
     end
+  end
+
+  def latest_sprint_in_semester?(sprint)
+    return false if sprint.blank? || @sprints.blank?
+
+    current_number = sprint.name.to_s[/\d+/].to_i
+    sprint_numbers = @sprints.map { |item| item.name.to_s[/\d+/].to_i }.select(&:positive?)
+    return current_number == sprint_numbers.max if current_number.positive? && sprint_numbers.any?
+
+    @sprints.last == sprint
   end
 
   def card_matches_sprint?(card, sprint)

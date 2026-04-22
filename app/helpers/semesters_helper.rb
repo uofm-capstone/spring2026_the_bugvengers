@@ -62,7 +62,7 @@ module SemestersHelper
   def github_chip_tooltip(chip)
     case chip.to_s.upcase
     when "GH"
-      "GitHub Composite: weighted score from KU (Kanban Updates, 35%), CBP (30%), PR (20%), and RVW (15%)."
+      "GitHub Composite: combined indicator from commit activity, pull request flow, and review participation for the sprint window."
     when "CBP"
       "Coding Best Practices: based on commit activity and code churn (lines changed) during the sprint window."
     when "PR"
@@ -76,6 +76,75 @@ module SemestersHelper
 
   def format_missing_github_flags(flags)
     Array(flags).map { |flag| flag.to_s.tr("_", " ") }.map(&:capitalize).join(", ")
+  end
+
+  def formatted_last_commit_display(metric)
+    payload = metric[:last_commit] || {}
+    flags = Array(payload[:missing_data_flags]).map(&:to_s)
+    data_available = payload[:data_available]
+    timestamp = payload[:at].presence || metric[:last_commit_at].presence
+
+    return "No GitHub username" if flags.include?("no_github_username")
+    return format_last_commit_timestamp(timestamp) if timestamp.present?
+
+    unavailable_flags = %w[repo_missing token_unavailable github_query_failed github_query_timeout github_student_data_unavailable]
+    return "GitHub data unavailable" if data_available == false || (flags & unavailable_flags).any?
+
+    "No commits in sprint"
+  end
+
+  def format_last_commit_timestamp(timestamp)
+    time = if timestamp.respond_to?(:in_time_zone)
+      timestamp
+    else
+      Time.zone.parse(timestamp.to_s)
+    end
+
+    return timestamp.to_s if time.blank?
+
+    time.in_time_zone("America/Chicago").strftime("%b %-d, %Y %-l:%M %p CT")
+  rescue ArgumentError, TypeError
+    timestamp.to_s
+  end
+
+  def team_last_commit_summary(team:, sprint:, status_metrics:)
+    student_metrics = team.students.map do |student|
+      status_metrics.dig(team.id, student.id, sprint) || {}
+    end
+
+    latest_commit = student_metrics
+      .filter_map { |metric| metric.dig(:last_commit, :at).presence || metric[:last_commit_at].presence }
+      .filter_map { |value| parse_last_commit_time(value) }
+      .max
+
+    return "Latest: #{format_last_commit_timestamp(latest_commit)}" if latest_commit.present?
+    return "GitHub data unavailable" if team_last_commit_data_unavailable?(student_metrics)
+
+    "No commits in sprint"
+  end
+
+  def team_last_commit_data_unavailable?(student_metrics)
+    unavailable_flags = %w[
+      repo_missing
+      token_unavailable
+      github_query_failed
+      github_query_timeout
+      github_student_data_unavailable
+    ]
+
+    Array(student_metrics).any? do |metric|
+      payload = metric[:last_commit] || {}
+      flags = Array(payload[:missing_data_flags]).map(&:to_s)
+      payload[:data_available] == false || (flags & unavailable_flags).any?
+    end
+  end
+
+  def parse_last_commit_time(value)
+    return value if value.respond_to?(:in_time_zone)
+
+    Time.zone.parse(value.to_s)
+  rescue ArgumentError, TypeError
+    nil
   end
 
 end

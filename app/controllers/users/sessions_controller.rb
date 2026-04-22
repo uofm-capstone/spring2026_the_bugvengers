@@ -27,6 +27,9 @@ class Users::SessionsController < Devise::SessionsController
   def create
     super do |user|
       user.update(last_login_at: Time.current)
+      LoginLog.create!(
+      user: user,
+      logged_in_at: Time.current)
     end
   end
 end

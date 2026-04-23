@@ -77,6 +77,12 @@ This project leverages an internally hosted Large Language Model (LLM) to analyz
 
 For more details on llm setup in the GCP, refer to: [LLM_SETUP_INSTRUCTIONS.md](./LLM_SETUP_INSTRUCTIONS.md)
 
+## Google Sheets Timesheet API Setup
+
+TAG includes a Google Sheets integration layer for timesheet ingestion on the status page for grading. This layer only authenticates, fetches worksheet/tab values, and prepares data for parser services.
+
+For full Google Sheets setup and configuration details, refer to: [GOOGLE_SHEETS_SETUP.md](./GOOGLE_SHEETS_SETUP.md)
+
 ## Legacy Manual Setup (Deprecated)
 1. Create a workspace folder to download your application.
 2. Navigate to your new workspace directory.

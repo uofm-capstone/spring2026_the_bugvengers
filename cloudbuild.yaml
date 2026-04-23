@@ -49,7 +49,7 @@ steps:
 
       # Secrets (must exist in this project)
       - "--set-secrets"
-      - "SECRET_KEY_BASE=secret-key-base:latest,DB_PASSWORD=db-password:latest"
+      - "SECRET_KEY_BASE=secret-key-base:latest,DB_PASSWORD=db-password:latest,GOOGLE_SHEETS_SERVICE_ACCOUNT_JSON_KEY=google-sheets-service-account-json-key:latest"
 
       # Auth
       - "--allow-unauthenticated"

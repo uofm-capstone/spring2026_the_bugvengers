@@ -208,8 +208,9 @@ class GoogleSheetsTimesheetParserService
         team_member: member_name,
         entries: entries,
         weekly_total: extract_weekly_total(
-          header_row: normalized_rows[header_info[:header_row_index]],
-          hours_row: hours_row
+          rows: normalized_rows,
+          hours_row_index: hours_row_index,
+          fallback_header_row_index: header_info[:header_row_index]
         )
       }
 
@@ -417,14 +418,73 @@ class GoogleSheetsTimesheetParserService
     value.gsub(/\s+/, " ")
   end
 
-  # Weekly totals are often in summary columns; we keep this value at the member
-  # record level for downstream checks but exclude summary columns from entries.
-  def extract_weekly_total(header_row:, hours_row:)
-    header_row.each_with_index do |header_value, col_index|
-      next unless header_value.to_s.match?(SUMMARY_COLUMN_PATTERN)
+  # Weekly totals are section-specific in sprint tabs that contain two time
+  # blocks. We therefore resolve the nearest header row for the current member
+  # block and prefer the "Average Hours/Week (Total)" column over "So Far".
+  def extract_weekly_total(rows:, hours_row_index:, fallback_header_row_index:)
+    header_row_index = find_section_header_row_index(
+      rows: rows,
+      hours_row_index: hours_row_index,
+      fallback_header_row_index: fallback_header_row_index
+    )
 
-      parsed, warning = parse_hours(hours_row[col_index].to_s.strip)
+    header_row = rows[header_row_index]
+    hours_row = rows[hours_row_index]
+
+    total_col_index = preferred_total_column_index(header_row)
+    if total_col_index
+      parsed, warning = parse_hours(hours_row[total_col_index].to_s.strip)
       return parsed unless warning
+    end
+
+    # Fallback: if explicit total label is missing, use the first summary column
+    # that is not clearly marked as "so far".
+    summary_col_index = fallback_summary_column_index(header_row)
+    return nil if summary_col_index.nil?
+
+    parsed, warning = parse_hours(hours_row[summary_col_index].to_s.strip)
+    warning ? nil : parsed
+  end
+
+  def find_section_header_row_index(rows:, hours_row_index:, fallback_header_row_index:)
+    scan_start = [hours_row_index - 1, 0].max
+
+    scan_start.downto(0) do |row_index|
+      row = rows[row_index]
+      next if row.nil?
+
+      has_dates = row.any? { |cell| !parse_cell_to_iso_date(cell).nil? }
+      has_summary = row.any? { |cell| cell.to_s.match?(SUMMARY_COLUMN_PATTERN) }
+      next unless has_dates && has_summary
+
+      return row_index
+    end
+
+    fallback_header_row_index
+  end
+
+  def preferred_total_column_index(header_row)
+    normalized = header_row.map { |value| value.to_s.downcase.gsub(/\s+/, " ").strip }
+
+    explicit_total = normalized.index do |value|
+      value.match?(/average hours\/week \(total\)/) ||
+        (value.include?("average hours") && value.include?("total")) ||
+        value.match?(/\bweekly total\b/)
+    end
+    return explicit_total unless explicit_total.nil?
+
+    normalized.index do |value|
+      value.match?(/\btotal\b/) && !value.include?("so far")
+    end
+  end
+
+  def fallback_summary_column_index(header_row)
+    header_row.each_with_index do |header_value, col_index|
+      normalized = header_value.to_s.downcase
+      next unless normalized.match?(SUMMARY_COLUMN_PATTERN)
+      next if normalized.include?("so far")
+
+      return col_index
     end
 
     nil

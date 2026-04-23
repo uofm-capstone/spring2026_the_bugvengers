@@ -184,4 +184,35 @@ class GoogleSheetsTimesheetParserServiceStandaloneTest < Minitest::Test
     assert_equal "2024-04-28", dates[0]
     assert_equal "2024-04-29", dates[1]
   end
+
+  def test_uses_section_specific_total_column_in_two_block_tab
+    tabs = [
+      {
+        tab_name: "Sprint 2 PC 1",
+        values: [
+          ["Team Member", "Kickoff to Progress Check", "4/1/2026", "4/2/2026", "Average Hours/Week (so far)", "Average Hours/Week (total)"],
+          ["Jonathan", "Hours Spent", "1", "2", "9.28", "9.28"],
+          ["", "Activity", "planning", "coding", "", ""],
+          ["Jason", "Hours Spent", "1", "2", "7.88", "7.88"],
+          ["", "Activity", "meeting", "review", "", ""],
+          ["Team Member", "Progress Check to Demo Day", "4/8/2026", "4/9/2026", "Average Hours/Week (so far)", "Average Hours/Week (total)"],
+          ["Jonathan", "Hours Spent", "2", "3", "1.5", "13.07"],
+          ["", "Activity", "feature", "testing", "", ""],
+          ["Jason", "Hours Spent", "2", "3", "1.5", "10.9"],
+          ["", "Activity", "fixes", "demo", "", ""]
+        ]
+      }
+    ]
+
+    result = build_service(tabs: tabs).call
+
+    assert_equal true, result[:ok]
+
+    sprint_records = result[:records].select { |record| record[:sprint_tab] == "Sprint 2 PC 1" }
+    jonathan_totals = sprint_records.select { |record| record[:team_member] == "Jonathan" }.map { |record| record[:weekly_total] }
+    jason_totals = sprint_records.select { |record| record[:team_member] == "Jason" }.map { |record| record[:weekly_total] }
+
+    assert_equal [9.28, 13.07], jonathan_totals
+    assert_equal [7.88, 10.9], jason_totals
+  end
 end

@@ -6,7 +6,13 @@ class TeamsController < ApplicationController
 
   def index
     @students = Student.where(semester_id: session[:last_viewed_semester_id]).order(:full_name)
-    @teams = Team.where(semester_id: session[:last_viewed_semester_id])
+    
+    if current_user.role == "student"
+      @teams = current_user.student ? current_user.student.teams : Team.none
+    else
+      @teams = Team.where(semester_id: session[:last_viewed_semester_id])
+    end
+
     @team = Team.new
     render :index
   end

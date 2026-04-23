@@ -29,6 +29,7 @@ gem "jbuilder"
 
 gem "dotenv"
 gem "octokit", "9.1.0"
+gem "redis", "~> 5.0"
 
 # Use Redis adapter to run Action Cable in production
 # gem "redis", "~> 4.0"

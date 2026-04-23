@@ -1,5 +1,6 @@
 # app/controllers/semesters_controller.rb
 class SemestersController < ApplicationController
+  require "digest"
   require 'text'
   require 'timeout'
   GITHUB_SCORE_WEIGHTS = {
@@ -340,6 +341,11 @@ end
     @semester = Semester.find_by(id: params[:id])
     return redirect_to(semesters_path) unless @semester
 
+    if ActiveModel::Type::Boolean.new.cast(params[:force_refresh])
+      session[:status_force_refresh_once] = true
+      return redirect_to semester_status_path(@semester, debug: params[:debug]), notice: "GitHub metrics will be refreshed now."
+    end
+
     session[:last_viewed_semester_id] = @semester.id
     render :show
   end
@@ -350,6 +356,8 @@ end
     return head :not_found unless @semester
 
     session[:last_viewed_semester_id] = @semester.id
+    @force_github_refresh = session.delete(:status_force_refresh_once) ||
+                ActiveModel::Type::Boolean.new.cast(params[:force_refresh])
 
     build_status_payload!
     @show_github_inspector = current_user.admin? && params[:debug] == "github"
@@ -659,7 +667,13 @@ end
 
     @teams.each do |team|
       team_service = GithubService.new(team: team, user: current_user)
-      board_health = safe_board_health(team_service: team_service, team: team)
+      team_cache_version = status_cache_version_for(team: team)
+      board_health = safe_board_health(
+        team_service: team_service,
+        team: team,
+        cache_version: team_cache_version,
+        force_refresh: @force_github_refresh
+      )
       project_cards = board_health.cards
       repo = team_service.parse_repo_url(team.repo_url)
       sprint_cards_by_name = {}
@@ -681,7 +695,9 @@ end
           repo: repo,
           sprint: sprint,
           students: team.students,
-          team: team
+          team: team,
+          cache_version: status_cache_version_for(team: team, sprint: sprint),
+          force_refresh: @force_github_refresh
         )
         github_metrics_by_sprint[sprint.name] = github_metrics
 
@@ -831,9 +847,13 @@ end
     end
   end
 
-  def safe_board_health(team_service:, team:)
+  def safe_board_health(team_service:, team:, cache_version: nil, force_refresh: false)
     Timeout.timeout(10) do
-      team_service.board_health(team.project_board_url)
+      team_service.board_health(
+        team.project_board_url,
+        cache_version: cache_version,
+        force_refresh: force_refresh
+      )
     end
   rescue Timeout::Error
     Rails.logger.warn("Board health query timed out for team #{team.id}")
@@ -843,13 +863,15 @@ end
     GithubService::BoardHealth.new([], [], false, [])
   end
 
-  def safe_github_sprint_metrics(team_service:, repo:, sprint:, students:, team:)
+  def safe_github_sprint_metrics(team_service:, repo:, sprint:, students:, team:, cache_version: nil, force_refresh: false)
     Timeout.timeout(8) do
       build_github_sprint_metrics(
         team_service: team_service,
         repo: repo,
         sprint: sprint,
-        students: students
+        students: students,
+        cache_version: cache_version,
+        force_refresh: force_refresh
       )
     end
   rescue Timeout::Error
@@ -1137,7 +1159,7 @@ end
     }
   end
 
-  def build_github_sprint_metrics(team_service:, repo:, sprint:, students:)
+  def build_github_sprint_metrics(team_service:, repo:, sprint:, students:, cache_version: nil, force_refresh: false)
     return empty_team_github_metrics(missing_data_flags: ["repo_missing"]) if repo.blank?
     return empty_team_github_metrics(repo: repo, missing_data_flags: ["token_unavailable"]) unless team_service.available?
 
@@ -1146,11 +1168,41 @@ end
     fallback_end_date = end_date.respond_to?(:to_date) ? end_date.to_date : Date.current
     fallback_start_date = fallback_end_date - 180.days
 
-    cbp_by_user = team_service.commit_metrics_by_user(repo, start_date, end_date)
-    last_commit_at_by_user = team_service.last_commit_at_by_user(repo, start_date, end_date)
-    fallback_last_commit_at_by_user = team_service.last_commit_at_by_user(repo, fallback_start_date, fallback_end_date)
-    pr_by_user = team_service.pr_metrics_by_user(repo, start_date, end_date)
-    review_by_user = team_service.review_metrics_by_user(repo, start_date, end_date)
+    cbp_by_user = team_service.commit_metrics_by_user(
+      repo,
+      start_date,
+      end_date,
+      cache_version: cache_version,
+      force_refresh: force_refresh
+    )
+    last_commit_at_by_user = team_service.last_commit_at_by_user(
+      repo,
+      start_date,
+      end_date,
+      cache_version: cache_version,
+      force_refresh: force_refresh
+    )
+    fallback_last_commit_at_by_user = team_service.last_commit_at_by_user(
+      repo,
+      fallback_start_date,
+      fallback_end_date,
+      cache_version: "#{cache_version}:fallback_last_commit",
+      force_refresh: force_refresh
+    )
+    pr_by_user = team_service.pr_metrics_by_user(
+      repo,
+      start_date,
+      end_date,
+      cache_version: cache_version,
+      force_refresh: force_refresh
+    )
+    review_by_user = team_service.review_metrics_by_user(
+      repo,
+      start_date,
+      end_date,
+      cache_version: cache_version,
+      force_refresh: force_refresh
+    )
 
     per_student = {}
     students.each do |student|
@@ -1234,6 +1286,31 @@ end
 
   def normalized_github_username(value)
     value.to_s.strip.sub(/\A@/, "").downcase
+  end
+
+  def status_cache_version_for(team:, sprint: nil)
+    student_fingerprint = team.students.order(:id).map do |student|
+      [
+        student.id,
+        normalized_github_username(student.github_username),
+        student.updated_at&.to_i
+      ].join(":")
+    end.join("|")
+
+    student_digest = Digest::SHA256.hexdigest(student_fingerprint)[0, 16]
+
+    parts = [
+      "semester:#{@semester.id}",
+      "team:#{team.id}:#{team.updated_at.to_i}",
+      "students:#{student_digest}"
+    ]
+
+    if sprint
+      parts << "sprint:#{sprint.id}:#{sprint.updated_at.to_i}"
+      parts << "window:#{sprint.start_date}:#{sprint.end_date}"
+    end
+
+    parts.join("|")
   end
 
   def empty_student_github_metrics(missing_data_flags: ["repo_or_token_missing"], data_available: false)

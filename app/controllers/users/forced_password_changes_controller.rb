@@ -12,11 +12,21 @@ class Users::ForcedPasswordChangesController < ApplicationController
       return render :edit
     end
 
-    if current_user.update(
+    updates = {
       password: params[:password],
-      password_confirmation: params[:password_confirmation]
-    )
-      current_user.update!(temp_password_changed: true, is_active: true)
+      password_confirmation: params[:password_confirmation],
+      temp_password_changed: true,
+      is_active: true
+    }
+
+    updates[:date_joined] = Time.current if current_user.date_joined.nil?
+
+    if current_user.update(updates)
+      current_user.update(last_login_at: Time.current)
+      LoginLog.create!(
+        user: current_user,
+        logged_in_at: Time.current
+      )
       bypass_sign_in(current_user)
       redirect_to root_path, notice: "Password updated. Welcome to TAG!"
     else

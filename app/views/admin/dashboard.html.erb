@@ -44,6 +44,7 @@
           <th>Email</th>
           <th>Role</th>
           <th>Last Logged In</th>
+          <th>Date Joined</th>
           <th>Activity Status</th>
           <th>Actions</th>
         </tr>
@@ -57,6 +58,7 @@
             <td>
               <%= user.last_login_at ? user.last_login_at.strftime("%Y-%m-%d %H:%M") : "Never" %>
             </td>
+            <td><%= user.date_joined&.strftime("%m/%d/%Y") || "Not set" %></td>
             <td>
               <% if user.is_active %>
                 <span style="color: green; font-weight: bold;">✔</span>

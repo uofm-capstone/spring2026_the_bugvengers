@@ -12,6 +12,7 @@ User.find_or_create_by(email: "email@email.com") do |user|
   user.password = "123456"
   user.is_active = true
   user.temp_password_changed = true
+  user.date_joined = "01/01/2024"
 end
 
 # Admin for Professor Amy Cook
@@ -21,6 +22,7 @@ User.find_or_create_by(email: "AmyCook@admin.com") do |user|
   user.role = :admin
   user.is_active = true
   user.temp_password_changed = true
+  user.date_joined = "01/01/2024"
 end
 
 # Admin for Professor Brandon Booth
@@ -30,6 +32,7 @@ User.find_or_create_by(email: "BrandonBooth@admin.com") do |user|
   user.role = :admin
   user.is_active = true
   user.temp_password_changed = true
+  user.date_joined = "01/01/2024"
 end
 
 # Admin for Derron Dowdy
@@ -39,6 +42,7 @@ User.find_or_create_by(email: "Dmdowdy@memphis.edu") do |user|
   user.role = :admin
   user.is_active = true
   user.temp_password_changed = true
+  user.date_joined = "01/01/2024"
 end
 
 # Adding more seed data
@@ -49,6 +53,7 @@ User.find_or_create_by(email: "doe.john@ta.edu") do |user|
   user.role = :ta
   user.is_active = true
   user.temp_password_changed = true
+  user.date_joined = "01/01/2024"
 end
 
 User.find_or_create_by(email: "smith.jame@ta.edu") do |user|
@@ -56,6 +61,7 @@ User.find_or_create_by(email: "smith.jame@ta.edu") do |user|
   user.role = :ta
   user.is_active = true
   user.temp_password_changed = true
+  user.date_joined = "01/01/2024"
 end
 
 =begin

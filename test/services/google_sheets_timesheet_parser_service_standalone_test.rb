@@ -104,4 +104,84 @@ class GoogleSheetsTimesheetParserServiceStandaloneTest < Minitest::Test
     assert_equal "research", result[:records][0][:entries][0][:activity]
     assert result[:warnings].any? { |warning| warning.include?("invalid hours 'N/A'") }
   end
+
+  def test_reuses_previous_member_name_for_merged_looking_hours_row
+    tabs = [
+      {
+        tab_name: "Sprint 2 PC 1",
+        values: [
+          ["Team Member", "Row Type", "4/11/2026", "4/12/2026"],
+          ["Jordan", "", "", ""],
+          ["", "Hours Spent", "1.0", "2.0"],
+          ["", "Activity", "planning", "coding"]
+        ]
+      }
+    ]
+
+    result = build_service(tabs: tabs).call
+
+    assert_equal true, result[:ok]
+    assert_equal 1, result[:records].size
+    assert_equal "Jordan", result[:records][0][:team_member]
+    assert_equal 2, result[:records][0][:entries].size
+  end
+
+  def test_assigns_unknown_member_placeholder_when_name_missing
+    tabs = [
+      {
+        tab_name: "Sprint 2 PC 2",
+        values: [
+          ["Team Member", "Row Type", "4/11/2026"],
+          ["", "Hours Spent", "2"],
+          ["", "Activity", "code review"]
+        ]
+      }
+    ]
+
+    result = build_service(tabs: tabs).call
+
+    assert_equal true, result[:ok]
+    assert_equal "Unknown Member 1", result[:records][0][:team_member]
+    assert result[:warnings].any? { |warning| warning.include?("missing member name") }
+  end
+
+  def test_parses_hour_suffix_and_clock_formats
+    tabs = [
+      {
+        tab_name: "Sprint 3 PC 2",
+        values: [
+          ["Name", "Type", "4/13/2026", "4/14/2026"],
+          ["Alex", "Hours Spent", "1.5 hrs", "2:30"],
+          ["", "Activity", "meeting", "implementation"]
+        ]
+      }
+    ]
+
+    result = build_service(tabs: tabs).call
+
+    assert_equal true, result[:ok]
+    entries = result[:records][0][:entries]
+    assert_equal 1.5, entries[0][:hours]
+    assert_equal 2.5, entries[1][:hours]
+  end
+
+  def test_parses_numeric_date_serial_cells
+    tabs = [
+      {
+        tab_name: "Sprint 4 PC 1",
+        values: [
+          ["Name", "Type", "45410", "45411"],
+          ["Morgan", "Hours Spent", "1", "1"],
+          ["", "Activity", "class time", "review"]
+        ]
+      }
+    ]
+
+    result = build_service(tabs: tabs).call
+
+    assert_equal true, result[:ok]
+    dates = result[:records][0][:entries].map { |entry| entry[:date] }
+    assert_equal "2024-04-28", dates[0]
+    assert_equal "2024-04-29", dates[1]
+  end
 end

@@ -41,7 +41,7 @@ class GoogleSheetsTimesheetParserService
 
   # These labels appear in summary/display columns that should not become daily
   # entries. We still read totals separately when useful.
-  SUMMARY_COLUMN_PATTERN = /(total|weekly\s*total|sum|overall)/i
+  SUMMARY_COLUMN_PATTERN = /(total|weekly\s*total|sum|overall|average\s*hours)/i
 
   # Timesheet row-label hints used to identify paired rows.
   HOURS_ROW_PATTERN = /(hours?\s*spent|hours?)/i
@@ -50,6 +50,9 @@ class GoogleSheetsTimesheetParserService
   # Header scan limit keeps parsing fast while still tolerant of top-of-sheet
   # spacing and title rows.
   MAX_HEADER_SCAN_ROWS = 8
+
+  # Google Sheets/Excel date serial base (with leap-year bug offset baked in).
+  SHEETS_SERIAL_BASE_DATE = Date.new(1899, 12, 30)
 
   def initialize(tabs:, tab_names: nil, logger: nil)
     @tabs = Array(tabs)
@@ -146,10 +149,27 @@ class GoogleSheetsTimesheetParserService
 
     records = []
     index = header_info[:header_row_index] + 1
+    last_seen_member_name = nil
+    unknown_member_counter = 0
 
     while index < normalized_rows.length
       row = normalized_rows[index]
       member_name = extract_member_name(row)
+      last_seen_member_name = member_name if member_name
+
+      if member_name.nil? && row_looks_like_hours_row?(row, header_info[:date_columns])
+        # Some sheets visually merge the name cell across multiple rows, leaving
+        # the hours row without a name. Reuse the most recent valid member when
+        # possible; otherwise create a deterministic placeholder.
+        if last_seen_member_name
+          member_name = last_seen_member_name
+          warnings << "Tab #{tab_name}: reused previous member name '#{member_name}' for merged-looking row near line #{index + 1}"
+        else
+          unknown_member_counter += 1
+          member_name = "Unknown Member #{unknown_member_counter}"
+          warnings << "Tab #{tab_name}: missing member name near line #{index + 1}; using #{member_name}"
+        end
+      end
 
       if member_name.nil?
         index += 1
@@ -247,6 +267,12 @@ class GoogleSheetsTimesheetParserService
 
     # Date parser should not treat summary labels or plain text as dates.
     return nil if value.match?(SUMMARY_COLUMN_PATTERN)
+
+    # Numeric date serials can appear when sheets are exported with raw numeric
+    # cell values. We parse this before regex checks.
+    serial_date = parse_numeric_date_serial(value)
+    return serial_date.iso8601 if serial_date
+
     return nil unless value.match?(/\d{1,2}[\/\-]\d{1,2}|[A-Za-z]{3,9}\s+\d{1,2}/)
 
     parse_date_value(value)&.iso8601
@@ -274,6 +300,17 @@ class GoogleSheetsTimesheetParserService
     end
 
     Date.parse(value)
+  end
+
+  # Converts spreadsheet serial day values (e.g., 45410) into Date objects.
+  # We intentionally reject very small/old serials to avoid false positives.
+  def parse_numeric_date_serial(value)
+    return nil unless value.match?(/\A\d+(\.\d+)?\z/)
+
+    serial = value.to_f
+    return nil if serial < 20_000
+
+    SHEETS_SERIAL_BASE_DATE + serial.to_i
   end
 
   # Member name is usually in the first column. We reject common non-name
@@ -337,7 +374,7 @@ class GoogleSheetsTimesheetParserService
       hours_value, hours_warning = parse_hours(raw_hours)
       warnings << "invalid hours '#{raw_hours}' on #{iso_date}" if hours_warning
 
-      activity_value = raw_activity.empty? ? nil : raw_activity
+      activity_value = normalize_activity(raw_activity)
 
       # Keep entries when either hours or activity exists so downstream analysis
       # can reason about partially-filled days instead of losing context.
@@ -356,10 +393,28 @@ class GoogleSheetsTimesheetParserService
   def parse_hours(raw_hours)
     return [nil, false] if raw_hours.empty?
 
-    normalized = raw_hours.gsub(",", "")
+    normalized = raw_hours.downcase.gsub(",", "").strip
+
+    # Support values such as "1.5 hrs", "2 h", and similar suffixes.
+    normalized = normalized.gsub(/\s*(hours?|hrs?|h)\z/, "")
+
     return [normalized.to_f, false] if normalized.match?(/\A-?\d+(\.\d+)?\z/)
 
+    # Support clock-style durations, e.g., 2:30 = 2.5 hours.
+    if normalized.match?(/\A\d{1,2}:\d{2}\z/)
+      hours, minutes = normalized.split(":").map(&:to_i)
+      return [hours + (minutes / 60.0), false]
+    end
+
     [nil, true]
+  end
+
+  def normalize_activity(raw_activity)
+    value = raw_activity.to_s.strip
+    return nil if value.empty?
+
+    # Collapse repeated spaces and preserve user text content.
+    value.gsub(/\s+/, " ")
   end
 
   # Weekly totals are often in summary columns; we keep this value at the member
@@ -387,6 +442,13 @@ class GoogleSheetsTimesheetParserService
       value = row[index].to_s.strip
       !value.empty? && !value.match?(/\A-?\d+(\.\d+)?\z/)
     end
+  end
+
+  def row_looks_like_hours_row?(row, date_columns)
+    label = row[1].to_s.downcase
+    return true if label.match?(HOURS_ROW_PATTERN)
+
+    numeric_cell_count(row, date_columns.keys) >= 1
   end
 
   def success_result(records:, tabs_processed:, warnings:, errors:)

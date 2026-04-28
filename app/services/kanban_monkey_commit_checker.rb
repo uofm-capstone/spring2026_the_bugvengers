@@ -17,6 +17,12 @@ class KanbanMonkeyCommitChecker
       return
     end
 
+    days_until_end = (sprint.end_date.to_date - Date.current).to_i
+    unless days_until_end <= 7
+      Rails.logger.info("[KanbanMonkey] Sprint ends in #{days_until_end} days — too early to remind. Exiting.")
+      return
+    end
+
     Rails.logger.info("[KanbanMonkey] Checking commits for #{semester.name_for_select} — #{sprint.name} (#{sprint.start_date.to_date} to #{sprint.end_date.to_date})")
 
     semester.teams.each do |team|

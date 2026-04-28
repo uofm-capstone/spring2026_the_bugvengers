@@ -16,12 +16,20 @@ class Users::ForcedPasswordChangesController < ApplicationController
       password: params[:password],
       password_confirmation: params[:password_confirmation]
     )
-      current_user.update!(temp_password_changed: true, is_active: true)
+      current_user.update!(
+        temp_password_changed: true,
+        is_active: true,
+        last_login_at: Time.current
+      )
+
+      LoginLog.create!(
+        user: current_user,
+        logged_in_at: Time.current
+      )
+
       bypass_sign_in(current_user)
+
       redirect_to root_path, notice: "Password updated. Welcome to TAG!"
-    else
-      flash.now[:alert] = current_user.errors.full_messages.join(", ")
-      render :edit
     end
   end
 end

@@ -32,7 +32,7 @@ This application is fully containerized and configured for local development usi
    Visit [https://docs.docker.com/get-docker/](https://docs.docker.com/get-docker/) if you haven’t already set up Docker.
 
 3. **Create Environment Folder and Run the App**  
-   For  setup instructions and troubleshooting tips, refer to Documentation.
+   For  setup instructions and troubleshooting tips, refer to [Documentation](https://github.com/uofm-capstone/spring2026_the_bugvengers/blob/main/Documentation%20For%20Setup%20(2).pdf).
 
 ## Google Cloud Deployment
 

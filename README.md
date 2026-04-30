@@ -31,14 +31,8 @@ This application is fully containerized and configured for local development usi
 2. **Ensure Docker and Docker Compose are installed**  
    Visit [https://docs.docker.com/get-docker/](https://docs.docker.com/get-docker/) if you haven’t already set up Docker.
 
-3. **Run the app**  
-   Use the following command from the project root:
-
-   ```bash
-   docker-compose up --build
-The application depends on the docker-compose.yml file to manage services and volumes. The PostgreSQL database and Rails server are both defined in this file and will not run correctly outside the containerized environment.
-
-For detailed setup instructions and troubleshooting tips, refer to [CONTAINER_DEVELOPMENT.md](./CONTAINER_DEVELOPMENT.md).
+3. **Create Environment Folder and Run the App**  
+   For  setup instructions and troubleshooting tips, refer to Documentation.
 
 ## Google Cloud Deployment
 

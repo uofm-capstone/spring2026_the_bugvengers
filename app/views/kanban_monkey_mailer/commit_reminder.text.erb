@@ -1,0 +1,13 @@
+Commit Reminder
+
+Hello <%= @student.full_name || @user.email %>,
+
+Our records show no GitHub commits from your account during the current sprint.
+
+Sprint: <%= @sprint.name %>
+Team: <%= @team.name %>
+Sprint period: <%= @sprint.start_date.strftime("%B %-d") %> – <%= @sprint.end_date.strftime("%B %-d, %Y") %>
+
+If you have already pushed commits, make sure your GitHub username on file matches your account. Otherwise, please push your work before the sprint ends.
+
+Questions? Reach out to your TA or professor.

@@ -4,6 +4,10 @@
 
 This document explains how to set up a **local Large Language Model (LLM)** using Ollama on a Google Cloud VM and connect it securely to the deployed Tool-Assisted Grading (TAG) application.
 
+We used the `gemma4:e2b` model on a `c3-highcpu-22` VM because it delivered 20-30 second responses while keeping costs around $0.90 for a full hour of runtime.
+
+Feel free to try out pulling other llm models and using other machine types in the Cloud VM if you think this can be more optimized.
+
 This setup was implemented to:
 
 * Avoid external APIs  
@@ -43,7 +47,7 @@ Compute Engine → VM Instances → Create Instance
 
 * **Name:** ollama-vm  
 * **Region:** Same as Cloud Run (e.g., `us-central1`)  
-* **Machine Type:** e2-standard-2 (or similar)  
+* **Machine Type:** c3-highcpu-22  
 * **Boot Disk:** Ubuntu (recommended)
 
 ### 3\. Create the instance and SSH into it
@@ -68,13 +72,13 @@ ollama \--version
 
 ### 3\. Pull a model
 
-ollama pull gemma:2b
+ollama pull gemma4:e2b
 
 ---
 
 ### 4\. Test locally
 
-ollama run gemma:2b
+ollama run gemma4:e2b
 
 Example prompt:
 
@@ -213,11 +217,24 @@ then Ollama is only bound to localhost and will not be externally reachable.
 
 ## Usage in Application
 
-The Rails application will call the LLM using the VM’s external IP:
+The Rails application will call the LLM using the VM's internal IP and the VPC connector:
 
-http://<external_ip>:11434/api/generate
+http://<internal_ip>:11434/api/generate
 
-This will be implemented in a service class (e.g., `LlmService`).
+Set a rails env var like `LLM_API_URL` in your cloudbuild.yaml to that internal URL so the app routes through the connector (for example: http://10.128.0.7:11434). Keep Cloud Run ingress set to allow all traffic so the app stays publicly reachable while still using the private VM.
+
+For local development, ensure these are present in `.env.development` for `app/services/llm_service.rb`:
+
+```env
+# Remote Ollama VM endpoint and model used by app/services/llm_service.rb.
+LLM_API_URL=http://[VM's Public IP]:11434
+
+# chosen model (edit this if needed)
+LLM_MODEL=gemma4:e2b
+
+# Request timeout in seconds for Ollama API calls.
+LLM_TIMEOUT_SECONDS=300
+```
 
 ---
 

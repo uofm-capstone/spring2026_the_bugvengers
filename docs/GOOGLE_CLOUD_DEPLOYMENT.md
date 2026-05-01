@@ -2,6 +2,8 @@
 
 This guide documents how to deploy the TAG application to **Google Cloud Run**. Each command is followed by an explanation and how to test it works.
 
+The Google Cloud Console and the `gcloud` CLI will be used throughout this process.
+
 ---
 
 
@@ -106,7 +108,9 @@ gcloud projects list
 
 Ensure [PROJECT_ID] appears in the list.
 
----
+**In Google Cloud Console:**
+- Open the Google Cloud Console (https://console.cloud.google.com/) and use the project selector in the top bar.
+- Confirm [PROJECT_ID] appears in the list and is selected.
 
 ---
 
@@ -117,6 +121,11 @@ This deployment uses:
 - `cloudbuild.yaml` for CI/CD automation with Google Cloud Build
 - `docker-compose.yml` for optional local development
 - Cloud SQL (PostgreSQL) for the production database
+
+**App file updates to plan for:**
+- Update `cloudbuild.yaml` to match your Artifact Registry repo name, Cloud Run service name, and deployment region.
+- Confirm `config/database.yml` matches your production database settings and env vars.
+- If you change runtime, ports, or build steps, update `Dockerfile` (and re-test locally).
 
 
 ## Prerequisites
@@ -177,7 +186,7 @@ Create a managed PostgreSQL database for your app:
 gcloud sql instances create [DB_INSTANCE_NAME] \
   --database-version=POSTGRES_14 \
   --tier=db-f1-micro \
-  --region=[REGION]
+  --region=[REGION] # we used us-central1
 
 # 2. Create a database
 gcloud sql databases create [DATABASE_NAME] --instance=[DB_INSTANCE_NAME]
@@ -328,6 +337,8 @@ Run `gcloud artifacts docker images list us-central1-docker.pkg.dev/[PROJECT_ID]
 
 Deploy your Docker image as a managed service on Cloud Run, connecting it to Cloud SQL and using secrets.
 
+**Ingress setting:** Keep ingress set to allow all traffic so the app remains publicly reachable (e.g., for GitHub API features) while still using the VPC connector for private VM access.
+
 ```bash
 gcloud run deploy [SERVICE_NAME] \
   --image us-central1-docker.pkg.dev/[PROJECT_ID]/[ARTIFACT_REGISTRY_REPO_NAME]/tag-app \
@@ -351,19 +362,7 @@ gcloud run deploy [SERVICE_NAME] \
 
 Your app is now live on Cloud Run.
 
-
-## 🧹 Teardown Instructions (Optional)
-
-Clean up all resources to avoid unnecessary charges:
-```bash
-gcloud run services delete [SERVICE_NAME] --region=us-central1
-gcloud sql instances delete [DB_INSTANCE_NAME] --region=us-central1
-gcloud artifacts repositories delete [ARTIFACT_REGISTRY_REPO_NAME] --location=us-central1
-gcloud secrets delete [SECRET_KEY_NAME]
-gcloud secrets delete [DB_PASSWORD_SECRET_NAME]
-```
-
-## CI/CD Automation (Optional but Recommended)
+## CI/CD Automation
 
 Automate build, push, and deploy steps using Cloud Build triggers.
 
@@ -373,6 +372,21 @@ Automate build, push, and deploy steps using Cloud Build triggers.
 3. Go to the Triggers page to create a trigger for your repository to build a docker image and deploy on push to `main`.
 
 Ensure your `cloudbuild.yaml` is present in the repo root before creating a trigger.
+
+**If you change build or deploy behavior, update `cloudbuild.yaml` first** (image tag, service name, region, and secret mappings).
+
+Completing this step allows for you to not have to manually create a new docker image and deploy after every push to main. The build trigger will do it for you.
+
+## 🧹 Teardown Instructions (Optional)
+
+Clean up all resources to avoid unnecessary charges:
+```bash
+gcloud run services delete [SERVICE_NAME] --region=[REGION]
+gcloud sql instances delete [DB_INSTANCE_NAME] --region=[REGION]
+gcloud artifacts repositories delete [ARTIFACT_REGISTRY_REPO_NAME] --location=[REGION]
+gcloud secrets delete [SECRET_KEY_NAME]
+gcloud secrets delete [DB_PASSWORD_SECRET_NAME]
+```
 
 ## 📎 Notes for the Future Teams
 

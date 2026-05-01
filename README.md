@@ -38,7 +38,7 @@ This application is fully containerized and configured for local development usi
    docker-compose up --build
 The application depends on the docker-compose.yml file to manage services and volumes. The PostgreSQL database and Rails server are both defined in this file and will not run correctly outside the containerized environment.
 
-For detailed setup instructions and troubleshooting tips, refer to [CONTAINER_DEVELOPMENT.md](./CONTAINER_DEVELOPMENT.md).
+For detailed setup instructions and troubleshooting tips, refer to [CONTAINER_DEVELOPMENT.md](./docs/CONTAINER_DEVELOPMENT.md).
 
 ## Google Cloud Deployment
 
@@ -69,46 +69,23 @@ This application is deployed on **Google Cloud Run** using a fully containerized
 - On app startup, Cloud Run probes port `8080` for health checks—this is preconfigured in the Dockerfile and app server.
 ---
 
-For more details on cloud setup and deployment steps, refer to: [GOOGLE_CLOUD_DEPLOYMENT.md](./GOOGLE_CLOUD_DEPLOYMENT.md)
+For more details on cloud setup and deployment steps, refer to: [GOOGLE_CLOUD_DEPLOYMENT.md](./docs/GOOGLE_CLOUD_DEPLOYMENT.md)
 
 ## LLM Setup for Client Feedback Sentiments
 
 This project leverages an internally hosted Large Language Model (LLM) to analyze parsed client feedback survey data. This allows for automated sentiment generation, providing valuable insights directly on student status pages. This approach ensures data privacy and keeps all processing within our GCP environment.
 
-For more details on llm setup in the GCP, refer to: [LLM_SETUP_INSTRUCTIONS.md](./LLM_SETUP_INSTRUCTIONS.md)
+For more details on llm setup in the GCP, refer to: [LLM_SETUP_INSTRUCTIONS.md](./docs/LLM_SETUP_INSTRUCTIONS.md)
 
 ## Google Sheets Timesheet API Setup
 
-TAG includes a Google Sheets integration layer for timesheet ingestion on the status page for grading. This layer only authenticates, fetches worksheet/tab values, and prepares data for parser services.
+TAG includes a Google Sheets integration layer for timesheet ingestion on the status page for grading, but we paused this path due to sprint scope. The Google Sheets setup doc reflects the original approach, and the future timesheet input doc explains why we recommend an in-app timesheet feature instead.
 
-For full Google Sheets setup and configuration details, refer to: [GOOGLE_SHEETS_SETUP.md](./GOOGLE_SHEETS_SETUP.md)
+For the original Google Sheets setup and configuration details, refer to: [GOOGLE_SHEETS_SETUP.md](./docs/GOOGLE_SHEETS_SETUP.md)
 
-## Legacy Manual Setup (Deprecated)
-1. Create a workspace folder to download your application.
-2. Navigate to your new workspace directory.
-3. Clone the repository using the following command: ```git clone git@github.com:mrhosier42/tag.git```
-4. Enter the Project Directory: ```cd tag```
-5. Install Bundler (if not installed): ```gem install bundler```
-6. Install Ruby Gems: ```bundle install```
-7. Install JS Dependencies: ```yarn install```
-   - If Yarn is not installed:
-     - Macos: If you have Homebrew installed: ```brew install yarn```
-     - Windows (using WSL w/ Ubuntu): ```npm install --global yarn```
-     - Linux: ```npm install --global yarn```
-8. Install rails: ```gem install rails```
-9. Set Up Database: ```rails db:create```
-10. Run Migrations: ```rails db:reset db:migrate```
-11. Start rails server: ```rails server``` (or ```rails s``` for short)
-12. Access the app: Open ```localhost:3000``` into your browser.
+For the aborted plan and our recommendation to build an in-app timesheet feature, refer to: [FUTURE_TIMESHEET_INPUT.md](./docs/FUTURE_TIMESHEET_INPUT.md)
 
-## Navigation to survey's:
-1. Sign up with a new account.
-2. Create a new semester.
-3. Load client and student survey data.
-4. Select a sprint and semester.
-5. View the page team you want to review.
-
-## Student CSV Format
+## Semester CSV Format for Registering
 
 Each semester requires a student CSV with the following columns:
 

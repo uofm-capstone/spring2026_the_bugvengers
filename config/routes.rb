@@ -54,6 +54,9 @@ Rails.application.routes.draw do
 
   # Team controller
   resources :teams do
+    collection do
+      post :import_csv
+    end
     member do
       post 'add_member'
       delete 'remove_member'

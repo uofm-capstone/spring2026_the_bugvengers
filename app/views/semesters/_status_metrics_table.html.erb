@@ -47,8 +47,7 @@
     </thead>
 
     <tbody>
-      <% sponsor_controls_row_rendered = false %>
-      <% sponsor_controls_rowspan = teams.sum { |team| team.students.size + 1 } %>
+      <% total_columns = 2 + (sprint_list.size * 6) + sponsor_columns.size %>
       <% teams.each do |team| %>
         <% team_summary = team_overview_by_id[team.id] || {} %>
         <% team.students.each_with_index do |student, i| %>
@@ -105,8 +104,8 @@
             <% end %>
 
             <% sponsor_columns.each do |sponsor_column| %>
-              <% if !sponsor_controls_row_rendered %>
-                <td rowspan="<%= sponsor_controls_rowspan %>" class="text-center align-middle sprint-group <%= sponsor_column[:css] %>">
+              <% if i == 0 %>
+                <td rowspan="<%= team.students.size + 1 %>" class="text-center align-middle sprint-group <%= sponsor_column[:css] %>">
                   <% sprint_label = sponsor_column[:sprint] %>
                   <% sprint_number = sprint_label.split.last %>
                   <% sprint_key = sponsor_column[:css] %>
@@ -134,8 +133,6 @@
                 </td>
               <% end %>
             <% end %>
-
-            <% sponsor_controls_row_rendered = true unless sponsor_controls_row_rendered %>
           </tr>
         <% end %>
 
@@ -172,6 +169,9 @@
             <% end %>
           <% end %>
 
+        </tr>
+        <tr class="team-spacer" aria-hidden="true">
+          <td colspan="<%= total_columns %>" style="height: 18px; background: #f8fafc;"></td>
         </tr>
       <% end %>
     </tbody>

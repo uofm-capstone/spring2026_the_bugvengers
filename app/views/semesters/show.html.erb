@@ -21,6 +21,18 @@
 
         <section class="semesters-status__section mt-4 text-center">
             <h2 class="semesters-status__title">Team Status</h2>
+            <% if current_user&.admin? || current_user&.ta? %>
+              <div class="mb-2 d-flex justify-content-center gap-2">
+                <%= link_to "Update Cached Status Data",
+                  semester_status_path(@semester, force_refresh: 1, debug: params[:debug]),
+                  class: "btn btn-sm btn-outline-primary" %>
+                <% if flash[:notice].to_s.downcase.include?("snapshot") %>
+                  <span class="badge text-bg-info align-self-center">Snapshot update requested</span>
+                <% end %>
+              </div>
+              <div class="text-muted small">
+              </div>
+            <% end %>
             <div class="alert alert-info semesters-status__loading" role="status" id="status-load-panel" style="opacity:1 !important; visibility:visible !important; transition:none !important;">
               <div class="mb-2">Loading status metrics from GitHub. This page is ready while data loads.</div>
               <div class="d-flex align-items-center justify-content-center gap-2">

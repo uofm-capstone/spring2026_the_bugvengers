@@ -40,6 +40,25 @@ class TeamsController < ApplicationController
     end
   end
 
+  def import_csv
+    semester_id = session[:last_viewed_semester_id]
+    return redirect_to(teams_path, alert: "Select a semester before importing students.") if semester_id.blank?
+
+    semester = Semester.find_by(id: semester_id)
+    return redirect_to(teams_path, alert: "Semester not found.") unless semester
+
+    authorize! :create, Team
+
+    file = params[:student_csv]
+    result = StudentRosterImportService.new(semester: semester, file: file).import
+
+    if result[:ok]
+      redirect_to teams_path, notice: result[:message]
+    else
+      redirect_to teams_path, alert: result[:message]
+    end
+  end
+
   def edit
     @semesters = Semester.all
     @students = Student.where.not(id: @team.student_ids)

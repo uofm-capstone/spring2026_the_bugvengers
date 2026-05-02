@@ -1,5 +1,11 @@
 <%= turbo_frame_tag "semester-status-content" do %>
   <div data-status-content-ready="1" class="d-none" aria-hidden="true"></div>
+  <% if @status_snapshot_built_at.present? %>
+    <div class="alert alert-info text-center mb-3">
+      Status snapshot built at <%= @status_snapshot_built_at.in_time_zone("America/Chicago").strftime("%b %-d, %Y %-l:%M %p CT") %>.
+      Refreshing without the update button should reuse this snapshot.
+    </div>
+  <% end %>
   <div class="row semesters-status__content-row">
     <div class="text-center semesters-status__content">
       <% if team_exist(@teams) %>

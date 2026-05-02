@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.0].define(version: 2026_05_02_120000) do
+ActiveRecord::Schema[7.0].define(version: 2026_04_23_203518) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -80,18 +80,6 @@ ActiveRecord::Schema[7.0].define(version: 2026_05_02_120000) do
     t.datetime "updated_at", null: false
     t.string "description"
     t.bigint "user_id"
-    t.text "sponsor_summary_sprint_2"
-    t.text "sponsor_summary_sprint_3"
-    t.text "sponsor_summary_sprint_4"
-    t.string "sponsor_sentiment_sprint_2"
-    t.string "sponsor_sentiment_sprint_3"
-    t.string "sponsor_sentiment_sprint_4"
-    t.datetime "sponsor_summary_generated_at_sprint_2"
-    t.datetime "sponsor_summary_generated_at_sprint_3"
-    t.datetime "sponsor_summary_generated_at_sprint_4"
-    t.string "sponsor_summary_model_sprint_2"
-    t.string "sponsor_summary_model_sprint_3"
-    t.string "sponsor_summary_model_sprint_4"
     t.index ["semester", "year"], name: "index_semesters_on_semester_and_year", unique: true
     t.index ["user_id"], name: "index_semesters_on_user_id"
   end
@@ -164,6 +152,7 @@ ActiveRecord::Schema[7.0].define(version: 2026_05_02_120000) do
     t.boolean "is_active", default: false, null: false
     t.boolean "temp_password_changed", default: false, null: false
     t.datetime "last_login_at"
+    t.datetime "date_joined"
     t.index ["email"], name: "index_users_on_email", unique: true
     t.index ["reset_password_token"], name: "index_users_on_reset_password_token", unique: true
   end

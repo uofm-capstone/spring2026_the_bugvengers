@@ -107,3 +107,6 @@ gem 'cancancan'
 gem 'sendgrid-ruby'
 gem 'google-apis-sheets_v4'
 gem 'googleauth'
+
+gem 'chartkick'
+gem 'groupdate'

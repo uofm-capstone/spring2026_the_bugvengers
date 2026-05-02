@@ -78,10 +78,6 @@ class LlmService
     resolve_prompt(prompt: prompt, normalized: normalized)
   end
 
-  def model_name
-    @model
-  end
-
   # Normalizes a 3-sentence summary into a deterministic display structure.
   # Intended for UI rendering when the model output format can vary slightly.
   def format_three_sentence_summary(text)

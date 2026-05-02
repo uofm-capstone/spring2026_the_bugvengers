@@ -425,15 +425,6 @@ end
         # fallback outputs so users always see immediate upload feedback.
         summary_override_text = summary_result[:summary_text]
 
-        if summary_result[:ok]
-          persist_sponsor_summary(
-            sprint_number: sprint_number,
-            summary_text: summary_result[:summary_text],
-            sentiment: summary_result[:sentiment],
-            model: summary_result[:model]
-          )
-        end
-
         unless summary_result[:ok]
           # Keep upload successful even when LLM fails so teams do not lose CSV data.
           # The fallback summary gives immediate UI feedback and can be overwritten
@@ -588,52 +579,6 @@ end
     when "4"
       :sponsor_csv_sprint_4
     end
-  end
-
-  def sponsor_summary_attribute_names(sprint_number)
-    case sprint_number.to_s
-    when "2"
-      {
-        summary: :sponsor_summary_sprint_2,
-        sentiment: :sponsor_sentiment_sprint_2,
-        generated_at: :sponsor_summary_generated_at_sprint_2,
-        model: :sponsor_summary_model_sprint_2
-      }
-    when "3"
-      {
-        summary: :sponsor_summary_sprint_3,
-        sentiment: :sponsor_sentiment_sprint_3,
-        generated_at: :sponsor_summary_generated_at_sprint_3,
-        model: :sponsor_summary_model_sprint_3
-      }
-    when "4"
-      {
-        summary: :sponsor_summary_sprint_4,
-        sentiment: :sponsor_sentiment_sprint_4,
-        generated_at: :sponsor_summary_generated_at_sprint_4,
-        model: :sponsor_summary_model_sprint_4
-      }
-    end
-  end
-
-  def persist_sponsor_summary(sprint_number:, summary_text:, sentiment:, model: nil)
-    attributes = sponsor_summary_attribute_names(sprint_number)
-    return if attributes.blank?
-
-    @semester.update(
-      attributes[:summary] => summary_text,
-      attributes[:sentiment] => sentiment,
-      attributes[:generated_at] => Time.current,
-      attributes[:model] => model
-    )
-  end
-
-  def persisted_sponsor_summary(sprint_label)
-    sprint_number = sprint_label.to_s[/\d+/]
-    attributes = sponsor_summary_attribute_names(sprint_number)
-    return nil if attributes.blank?
-
-    @semester.public_send(attributes[:summary])
   end
 
   # Executes parse + LLM summary generation through SponsorSummaryService.
@@ -850,7 +795,6 @@ end
 
     sponsor_sources.each do |sprint_label, attachment|
       override_summary = @sponsor_summary_overrides&.[](sprint_label)
-      stored_summary = persisted_sponsor_summary(sprint_label)
 
       # UI guardrail: treat a sprint as "ready" only when the attachment exists
       # and can be parsed successfully. This prevents stale ActiveStorage metadata
@@ -880,8 +824,6 @@ end
       #    of the current request lifecycle.
       @sponsor_summary_text[sprint_label] = if override_summary.present?
                                               override_summary
-                                            elsif stored_summary.present?
-                                              stored_summary
                                             else
                                               "#{sprint_label} sponsor CSV uploaded. Summary has not been generated yet. Re-upload to retry analysis."
                                             end

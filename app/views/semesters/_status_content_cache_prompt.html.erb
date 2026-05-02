@@ -1,0 +1,17 @@
+<%= turbo_frame_tag "semester-status-content" do %>
+  <div data-status-content-ready="1" class="d-none" aria-hidden="true"></div>
+
+  <div class="row">
+    <div class="mt-4 text-center">
+      <h2>Team Status</h2>
+      <div class="alert alert-info" role="status">
+        No cached status snapshot exists yet for this semester.
+        Click the button below to fetch GitHub data once and save it.
+        After that, the page will keep showing the saved snapshot until you click update again.
+      </div>
+      <%= link_to "Build Initial Status Snapshot",
+        semester_status_path(@semester, force_refresh: 1, debug: params[:debug]),
+        class: "btn btn-primary btn-sm" %>
+    </div>
+  </div>
+<% end %>

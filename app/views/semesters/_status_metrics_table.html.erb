@@ -47,6 +47,7 @@
     </thead>
 
     <tbody>
+      <% total_columns = 2 + (sprint_list.size * 6) + sponsor_columns.size %>
       <% teams.each do |team| %>
         <% team_summary = team_overview_by_id[team.id] || {} %>
         <% team.students.each_with_index do |student, i| %>
@@ -170,6 +171,9 @@
             <% end %>
           <% end %>
 
+        </tr>
+        <tr class="team-spacer" aria-hidden="true">
+          <td colspan="<%= total_columns %>" style="height: 18px; background: #f8fafc;"></td>
         </tr>
       <% end %>
     </tbody>

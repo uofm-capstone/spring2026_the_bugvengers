@@ -69,8 +69,22 @@ Rails.application.configure do
   # Prepend all log lines with the following tags.
   config.log_tags = [ :request_id ]
 
-  # Use a different cache store in production.
-  # config.cache_store = :mem_cache_store
+  # Use a shared cache store in production for GitHub status metrics.
+  if ENV["REDIS_URL"].present?
+    config.cache_store = :redis_cache_store, {
+      url: ENV["REDIS_URL"],
+      connect_timeout: 2,
+      read_timeout: 2,
+      write_timeout: 2,
+      reconnect_attempts: 1,
+      error_handler: ->(method:, returning:, exception:) {
+        Rails.logger.warn("Redis cache error: #{method} returned #{returning.inspect} (#{exception.class}: #{exception.message})")
+      }
+    }
+  else
+    # Fallback for environments that do not provide Redis.
+    config.cache_store = :memory_store, { size: 134_217_728 }
+  end
 
   # Use a real queuing backend for Active Job (and separate queues per environment).
   # config.active_job.queue_adapter     = :resque

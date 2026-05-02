@@ -128,13 +128,15 @@ class GithubService
     board_health(project_url).cards
   end
 
-  def board_health(project_url, stale_after_days: 14)
+  def board_health(project_url, stale_after_days: 14, cache_version: nil, force_refresh: false)
     return BoardHealth.new([], [], false, []) unless @client
 
     cache_fetch(
       "board_health",
       project_url,
       stale_after_days,
+      cache_version: cache_version,
+      force_refresh: force_refresh,
       expires_in: 3.minutes
     ) do
       org, number = parse_project_url(project_url)
@@ -323,7 +325,7 @@ class GithubService
     return assignee_counts
   end
 
-  def commit_metrics_by_user(repo, start_date, end_date)
+  def commit_metrics_by_user(repo, start_date, end_date, cache_version: nil, force_refresh: false)
     return {} unless @client
 
     start_time = normalize_time(start_date)
@@ -334,6 +336,8 @@ class GithubService
       repo,
       start_time&.iso8601,
       end_time&.iso8601,
+      cache_version: cache_version,
+      force_refresh: force_refresh,
       expires_in: 10.minutes
     ) do
       commits = commits_in_range(repo, start_time, end_time)
@@ -369,7 +373,7 @@ class GithubService
     {}
   end
 
-  def last_commit_at_by_user(repo, start_date, end_date)
+  def last_commit_at_by_user(repo, start_date, end_date, cache_version: nil, force_refresh: false)
     return {} unless @client
 
     start_time = normalize_time(start_date)
@@ -380,6 +384,8 @@ class GithubService
       repo,
       start_time&.iso8601,
       end_time&.iso8601,
+      cache_version: cache_version,
+      force_refresh: force_refresh,
       expires_in: 10.minutes
     ) do
       commits = commits_in_range(repo, start_time, end_time)
@@ -440,7 +446,7 @@ class GithubService
     CBPResult.new(0, 0, 0, 0)
   end
 
-  def pr_metrics_by_user(repo, start_date, end_date)
+  def pr_metrics_by_user(repo, start_date, end_date, cache_version: nil, force_refresh: false)
     return {} unless @client
 
     start_time = normalize_time(start_date)
@@ -451,6 +457,8 @@ class GithubService
       repo,
       start_time&.iso8601,
       end_time&.iso8601,
+      cache_version: cache_version,
+      force_refresh: force_refresh,
       expires_in: 10.minutes
     ) do
       pulls = pull_requests(repo)
@@ -507,7 +515,7 @@ class GithubService
     {}
   end
 
-  def review_metrics_by_user(repo, start_date, end_date)
+  def review_metrics_by_user(repo, start_date, end_date, cache_version: nil, force_refresh: false)
     return {} unless @client
 
     start_time = normalize_time(start_date)
@@ -518,6 +526,8 @@ class GithubService
       repo,
       start_time&.iso8601,
       end_time&.iso8601,
+      cache_version: cache_version,
+      force_refresh: force_refresh,
       expires_in: 10.minutes
     ) do
       pulls = pull_requests(repo)
@@ -573,8 +583,20 @@ class GithubService
 
   private
 
-  def cache_fetch(metric_name, *parts, expires_in:)
-    key = ["github_service", metric_name, @cache_namespace, *parts.map(&:to_s)]
+  def cache_fetch(metric_name, *parts, expires_in:, cache_version: nil, force_refresh: false)
+    version = cache_version.to_s.presence || "v1"
+    key = ["github_service", metric_name, @cache_namespace, version, *parts.map(&:to_s)]
+
+    if force_refresh
+      value = yield
+      if rails_cache_enabled?
+        Rails.cache.write(key, value, expires_in: expires_in)
+      else
+        self.class.shared_cache_write(key, value, expires_in: expires_in)
+      end
+      return value
+    end
+
     if rails_cache_enabled?
       Rails.cache.fetch(key, expires_in: expires_in) { yield }
     else
@@ -586,28 +608,52 @@ class GithubService
     !Rails.cache.class.name.include?("NullStore")
   end
 
+  def self.shared_cache_write(key, value, expires_in:)
+    now = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+
+    shared_cache_lock.synchronize do
+      shared_cache[key] = { value: value, expires_at: now + expires_in.to_f }
+      shared_cache.shift if shared_cache.size > 800
+    end
+
+    value
+  end
+
   def commit_details(repo, sha)
     cache_key = [repo, sha]
     return @commit_details_cache[cache_key] if @commit_details_cache.key?(cache_key)
 
-    @commit_details_cache[cache_key] = @client.commit(repo, sha)
+    @commit_details_cache[cache_key] = cache_fetch(
+      "commit_details",
+      repo,
+      sha,
+      expires_in: 12.hours
+    ) do
+      @client.commit(repo, sha)
+    end
   end
 
   def pull_requests(repo)
     return @pull_requests_cache[repo] if @pull_requests_cache.key?(repo)
 
-    pulls = []
-    page = 1
+    @pull_requests_cache[repo] = cache_fetch(
+      "pull_requests",
+      repo,
+      expires_in: 10.minutes
+    ) do
+      pulls = []
+      page = 1
 
-    loop do
-      batch = @client.pull_requests(repo, state: "all", per_page: 100, page: page)
-      break if batch.blank?
+      loop do
+        batch = @client.pull_requests(repo, state: "all", per_page: 100, page: page)
+        break if batch.blank?
 
-      pulls.concat(batch)
-      page += 1
+        pulls.concat(batch)
+        page += 1
+      end
+
+      pulls
     end
-
-    @pull_requests_cache[repo] = pulls
   rescue Octokit::NotFound
     @logger.warn("Repository not found for pull request query: #{repo}")
     @pull_requests_cache[repo] = []
@@ -617,18 +663,25 @@ class GithubService
     cache_key = [repo, pull_number]
     return @pull_request_reviews_cache[cache_key] if @pull_request_reviews_cache.key?(cache_key)
 
-    reviews = []
-    page = 1
+    @pull_request_reviews_cache[cache_key] = cache_fetch(
+      "pull_request_reviews",
+      repo,
+      pull_number,
+      expires_in: 10.minutes
+    ) do
+      reviews = []
+      page = 1
 
-    loop do
-      batch = @client.pull_request_reviews(repo, pull_number, per_page: 100, page: page)
-      break if batch.blank?
+      loop do
+        batch = @client.pull_request_reviews(repo, pull_number, per_page: 100, page: page)
+        break if batch.blank?
 
-      reviews.concat(batch)
-      page += 1
+        reviews.concat(batch)
+        page += 1
+      end
+
+      reviews
     end
-
-    @pull_request_reviews_cache[cache_key] = reviews
   rescue Octokit::NotFound
     @pull_request_reviews_cache[cache_key] = []
   end

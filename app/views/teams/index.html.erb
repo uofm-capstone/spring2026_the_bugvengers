@@ -10,6 +10,21 @@
   %>
 </div>
 
+<section class="teams-index__table-card">
+  <div class="teams-index__table-header">
+    <h2>Import Team Roster CSV</h2>
+  </div>
+  <div class="p-3">
+    <p class="text-muted mb-2">
+      Upload a roster CSV to create/update students and teams for the selected semester.
+    </p>
+    <%= form_with url: import_csv_teams_path, method: :post, local: true, html: { multipart: true, class: "d-flex flex-wrap gap-2 align-items-center" } do %>
+      <%= file_field_tag :student_csv, accept: ".csv", class: "form-control", required: true %>
+      <%= submit_tag "Import CSV", class: "btn btn-ui-primary" %>
+    <% end %>
+  </div>
+</section>
+
 <div class="modal fade" id="newTeamModal" tabindex="-1" aria-labelledby="newTeamModalLabel" aria-hidden="true">
   <div class="modal-dialog">
     <div class="modal-content">

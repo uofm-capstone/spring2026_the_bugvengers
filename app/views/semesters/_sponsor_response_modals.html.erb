@@ -4,21 +4,23 @@
   { sprint: "Sprint 4", css: "sprint-4" }
 ] %>
 
-<% sponsor_columns.each do |sponsor_column| %>
-  <% sprint_label = sponsor_column[:sprint] %>
-  <% sprint_key = sponsor_column[:css] %>
-  <% attached = @sponsor_csv_attached[sprint_label] %>
-  <% next unless attached %>
+<% @teams.each do |team| %>
+  <% sponsor_columns.each do |sponsor_column| %>
+    <% sprint_label = sponsor_column[:sprint] %>
+    <% sprint_key = sponsor_column[:css] %>
+    <% control_key = "team-#{team.id}-#{sprint_key}" %>
+    <% attached = @sponsor_csv_attached.dig(team.id, sprint_label) %>
+    <% next unless attached %>
 
-  <div class="modal fade" id="sponsorSummaryModal-<%= sprint_key %>" tabindex="-1" aria-labelledby="sponsorSummaryModalLabel-<%= sprint_key %>" aria-hidden="true">
+  <div class="modal fade" id="sponsorSummaryModal-<%= control_key %>" tabindex="-1" aria-labelledby="sponsorSummaryModalLabel-<%= control_key %>" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
       <div class="modal-content">
         <div class="modal-header">
-          <h5 class="modal-title" id="sponsorSummaryModalLabel-<%= sprint_key %>"><%= sprint_label %> Summary</h5>
+          <h5 class="modal-title" id="sponsorSummaryModalLabel-<%= control_key %>"><%= sprint_label %> Summary - <%= team.name %></h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
         <div class="modal-body">
-          <% raw_summary = @sponsor_summary_text[sprint_label].to_s %>
+          <% raw_summary = @sponsor_summary_text.dig(team.id, sprint_label).to_s %>
           <% summary_lines = raw_summary.split(/\r?\n+/).map(&:strip).reject(&:blank?) %>
           <% if summary_lines.size <= 1 && raw_summary.include?(" - ") %>
             <% summary_lines = raw_summary.split(/\s+-\s+/).map(&:strip).reject(&:blank?) %>
@@ -33,7 +35,7 @@
           <% else %>
             <p class="mb-2">No summary available.</p>
           <% end %>
-          <p class="mb-0 text-muted small">Parsed responses: <%= @sponsor_rows_count[sprint_label] %></p>
+          <p class="mb-0 text-muted small">Parsed responses: <%= @sponsor_rows_count.dig(team.id, sprint_label) %></p>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
@@ -42,15 +44,15 @@
     </div>
   </div>
 
-  <div class="modal fade" id="sponsorQuestionsModal-<%= sprint_key %>" tabindex="-1" aria-labelledby="sponsorQuestionsModalLabel-<%= sprint_key %>" aria-hidden="true">
+  <div class="modal fade" id="sponsorQuestionsModal-<%= control_key %>" tabindex="-1" aria-labelledby="sponsorQuestionsModalLabel-<%= control_key %>" aria-hidden="true">
     <div class="modal-dialog modal-xl modal-dialog-scrollable">
       <div class="modal-content">
         <div class="modal-header">
-          <h5 class="modal-title" id="sponsorQuestionsModalLabel-<%= sprint_key %>"><%= sprint_label %> Sponsor Feedback</h5>
+          <h5 class="modal-title" id="sponsorQuestionsModalLabel-<%= control_key %>"><%= sprint_label %> Sponsor Feedback - <%= team.name %></h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
         <div class="modal-body">
-          <% details = @sponsor_details[sprint_label] || [] %>
+          <% details = @sponsor_details.dig(team.id, sprint_label) || [] %>
           <% if details.blank? %>
             <div class="alert alert-info mb-0" role="alert">
               No sponsor question rows are available to display.
@@ -92,4 +94,5 @@
       </div>
     </div>
   </div>
+  <% end %>
 <% end %>

@@ -32,6 +32,8 @@ class SponsorSummaryService
   def initialize(
     semester:,
     sprint_number:,
+    attachment: nil,
+    team: nil,
     parser_class: CSVSurveyParserService,
     llm_service_builder: nil,
     logger: nil
@@ -42,6 +44,8 @@ class SponsorSummaryService
     # Sprint is normalized once to avoid repeated type coercion and subtle
     # branching bugs when controller params arrive as strings.
     @sprint_number = sprint_number.to_s.strip
+    @attachment = attachment
+    @team = team
     # Parser and LLM builder are injectable to keep tests fast and isolated.
     @parser_class = parser_class
     @llm_service_builder = llm_service_builder
@@ -59,18 +63,7 @@ class SponsorSummaryService
   def generate
     # Step 1: Select the correct ActiveStorage attachment for the sprint.
     # Invalid sprint values should fail gracefully and never raise into controller.
-    attachment_name = sponsor_attachment_name_for_sprint
-    unless attachment_name
-      return failure_result(
-        error_code: "invalid_sprint",
-        message: "Invalid sprint number for sponsor summary generation.",
-        rows_count: 0
-      )
-    end
-
-    # Step 2: Ensure upload exists before parsing. This protects from stale UI
-    # state where a summary request can race with attachment changes.
-    attachment = @semester.public_send(attachment_name)
+    attachment = @attachment || attachment_for_sprint
     unless attachment&.attached?
       return failure_result(
         error_code: "missing_attachment",
@@ -83,6 +76,10 @@ class SponsorSummaryService
     # same column/normalization rules already used by the Questions modal.
     parsed = parse_attachment(attachment)
     rows_count = parsed[:rows].to_a.size
+
+    if @team
+      parsed = filter_parsed_for_team(parsed, @team)
+    end
 
     # If parser reports errors, we do not call LLM. This prevents generating
     # misleading sentiment from malformed or partially understood data.
@@ -145,6 +142,8 @@ class SponsorSummaryService
     {
       ok: true,
       summary_text: summary_text,
+      sentiment: formatted[:sentiment],
+      model: llm_service.model_name,
       rows_count: rows_count,
       message: "Sponsor summary generated successfully.",
       error_code: nil
@@ -176,12 +175,37 @@ class SponsorSummaryService
     end
   end
 
+  def attachment_for_sprint
+    attachment_name = sponsor_attachment_name_for_sprint
+    return nil unless attachment_name
+
+    @semester.public_send(attachment_name)
+  end
+
   # Parser is executed against the opened attachment IO so large files do not
   # need to be copied around in memory.
   def parse_attachment(attachment)
     attachment.open do |file|
       @parser_class.new(file: file).parse
     end
+  end
+
+  def filter_parsed_for_team(parsed, team)
+    team_name = team.respond_to?(:name) ? team.name.to_s.strip : team.to_s.strip
+    return parsed if team_name.blank?
+
+    respondents = Array(parsed[:respondents]).select do |respondent|
+      metadata = respondent[:metadata] || {}
+      metadata_team = metadata[:team].to_s.strip
+      metadata_team.casecmp(team_name).zero?
+    end
+
+    rows = Array(parsed[:rows]).select do |row|
+      row_team = row[:q1_team].to_s.strip
+      row_team.casecmp(team_name).zero?
+    end
+
+    parsed.merge(respondents: respondents, rows: rows)
   end
 
   # Dependency injection entry point used by tests to avoid network calls.

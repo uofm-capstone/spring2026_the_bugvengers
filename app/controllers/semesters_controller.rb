@@ -401,31 +401,45 @@ end
     sprint_number = params[:sprint_number].to_s.strip
     sprint_label = "Sprint #{sprint_number}"
     sprint_key = "sprint-#{sprint_number}"
+    team = @semester.teams.find_by(id: params[:team_id])
     attachment_name = sponsor_attachment_name_for_sprint(sprint_number)
     summary_override_text = nil
     success = false
     message = nil
 
-    if attachment_name.nil?
+    if team.nil?
+      message = "Invalid team for sponsor CSV upload."
+    elsif attachment_name.nil?
       message = "Invalid sprint for sponsor CSV upload."
     elsif params[:sponsor_csv].present?
-      attachment = @semester.public_send(attachment_name)
-      attachment.attach(params[:sponsor_csv])
-      success = attachment.attached?
+      survey = team.sponsor_surveys.find_or_initialize_by(sprint_number: sprint_number)
+      survey.csv.attach(params[:sponsor_csv])
+      success = survey.csv.attached?
       message = success ? "#{sprint_label} sponsor CSV uploaded successfully." : "#{sprint_label} sponsor CSV upload failed."
 
       # Important behavior contract for the status page:
       # run summary analysis only when the user explicitly uploads a CSV.
       # We never trigger LLM analysis from page-load rendering paths.
       if success
-        summary_result = generate_sponsor_summary(sprint_number: sprint_number)
+        summary_result = generate_sponsor_summary(
+          sprint_number: sprint_number,
+          attachment: survey.csv,
+          team: team
+        )
 
         # Without persistence, the current request must carry the generated
         # summary into modal rendering. This applies to both success and
         # fallback outputs so users always see immediate upload feedback.
         summary_override_text = summary_result[:summary_text]
 
-        unless summary_result[:ok]
+        if summary_result[:ok]
+          survey.update(
+            summary_text: summary_result[:summary_text],
+            sentiment: summary_result[:sentiment],
+            summary_model: summary_result[:model],
+            summary_generated_at: Time.current
+          )
+        else
           # Keep upload successful even when LLM fails so teams do not lose CSV data.
           # The fallback summary gives immediate UI feedback and can be overwritten
           # by a future re-upload once the LLM endpoint is healthy.
@@ -442,7 +456,7 @@ end
 
     # Upload response can include one-off summary text for this request only.
     # This keeps summary rendering transient and avoids cross-page persistence.
-    @sponsor_summary_overrides = { sprint_label => summary_override_text }
+    @sponsor_summary_overrides = { team&.id => { sprint_label => summary_override_text } }
     build_sponsor_ui_payload!
 
     respond_to do |format|
@@ -583,8 +597,13 @@ end
 
   # Executes parse + LLM summary generation through SponsorSummaryService.
   # Summary storage is handled separately in session-scoped cache helpers.
-  def generate_sponsor_summary(sprint_number:)
-    SponsorSummaryService.new(semester: @semester, sprint_number: sprint_number).generate
+  def generate_sponsor_summary(sprint_number:, attachment: nil, team: nil)
+    SponsorSummaryService.new(
+      semester: @semester,
+      sprint_number: sprint_number,
+      attachment: attachment,
+      team: team
+    ).generate
   rescue StandardError => e
     Rails.logger.error("Sponsor summary generation failed for semester #{@semester.id}: #{e.class} - #{e.message}")
 
@@ -749,12 +768,6 @@ end
   end
 
   def build_sponsor_scores_by_team!
-    sprint_sources = {
-      "Sprint 2" => @semester.sponsor_csv_sprint_2,
-      "Sprint 3" => @semester.sponsor_csv_sprint_3,
-      "Sprint 4" => @semester.sponsor_csv_sprint_4
-    }
-
     @sponsor_scores_by_team = @teams.each_with_object({}) do |team, acc|
       acc[team.name] = {
         "Sprint 2" => nil,
@@ -763,18 +776,21 @@ end
       }
     end
 
-    sprint_sources.each do |sprint_label, attachment|
-      next unless attachment.attached?
+    @teams.each do |team|
+      team.sponsor_surveys.each do |survey|
+        sprint_label = "Sprint #{survey.sprint_number}"
+        next unless @sponsor_scores_by_team[team.name]&.key?(sprint_label)
+        next unless survey.csv.attached?
 
-      parsed = parse_sponsor_csv(attachment: attachment)
-      rows = parsed[:rows] || []
-      next if parsed[:errors].present? || rows.blank?
+        parsed = parse_sponsor_csv(attachment: survey.csv)
+        rows = parsed[:rows] || []
+        next if parsed[:errors].present? || rows.blank?
 
-      performance_columns = rows.first.keys.select { |header| header.to_s.match?(PERFORMANCE_PATTERN) }
+        performance_columns = rows.first.keys.select { |header| header.to_s.match?(PERFORMANCE_PATTERN) }
+        next if performance_columns.blank?
 
-      @teams.each do |team|
         matching_rows = best_matching_team_rows(client_rows: rows, team: team.name, sprint: sprint_label)
-        next if matching_rows.blank? || performance_columns.blank?
+        next if matching_rows.blank?
 
         @sponsor_scores_by_team[team.name][sprint_label] = calculate_score(matching_rows.first, performance_columns)
       end
@@ -782,52 +798,45 @@ end
   end
 
   def build_sponsor_ui_payload!
-    sponsor_sources = {
-      "Sprint 2" => @semester.sponsor_csv_sprint_2,
-      "Sprint 3" => @semester.sponsor_csv_sprint_3,
-      "Sprint 4" => @semester.sponsor_csv_sprint_4
-    }
+    sprint_labels = ["Sprint 2", "Sprint 3", "Sprint 4"]
 
-    @sponsor_csv_attached = {}
-    @sponsor_rows_count = {}
-    @sponsor_summary_text = {}
-    @sponsor_details = {}
+    @sponsor_csv_attached = Hash.new { |hash, key| hash[key] = {} }
+    @sponsor_rows_count = Hash.new { |hash, key| hash[key] = {} }
+    @sponsor_summary_text = Hash.new { |hash, key| hash[key] = {} }
+    @sponsor_details = Hash.new { |hash, key| hash[key] = {} }
 
-    sponsor_sources.each do |sprint_label, attachment|
-      override_summary = @sponsor_summary_overrides&.[](sprint_label)
-
-      # UI guardrail: treat a sprint as "ready" only when the attachment exists
-      # and can be parsed successfully. This prevents stale ActiveStorage metadata
-      # (common in ephemeral deploy environments) from showing Summary/Questions
-      # controls when the underlying file is missing.
-      @sponsor_csv_attached[sprint_label] = false
-      @sponsor_rows_count[sprint_label] = 0
-      @sponsor_summary_text[sprint_label] = "Upload a sponsor CSV for #{sprint_label} to view summary and detailed questions."
-      @sponsor_details[sprint_label] = []
-
-      next unless attachment.attached?
-
-      parsed = parse_sponsor_csv(attachment: attachment)
-      @sponsor_rows_count[sprint_label] = parsed[:rows].size
-
-      if parsed[:errors].present?
-        # Keep upload controls in "Upload CSV first" state when parse fails,
-        # because actionable summary/details are not available yet.
-        next
+    @teams.each do |team|
+      sprint_labels.each do |sprint_label|
+        override_summary = @sponsor_summary_overrides&.dig(team.id, sprint_label)
+        @sponsor_csv_attached[team.id][sprint_label] = false
+        @sponsor_rows_count[team.id][sprint_label] = 0
+        @sponsor_summary_text[team.id][sprint_label] = "Upload a sponsor CSV for #{sprint_label} to view summary and detailed questions."
+        @sponsor_details[team.id][sprint_label] = []
       end
 
-      @sponsor_csv_attached[sprint_label] = true
+      team.sponsor_surveys.each do |survey|
+        sprint_label = "Sprint #{survey.sprint_number}"
+        next unless sprint_labels.include?(sprint_label)
+        next unless survey.csv.attached?
 
-      # Summary display precedence:
-      # 1) upload-time override for this request (typically LLM warning fallback)
-      # 2) explicit waiting message when a CSV exists but summary is not part
-      #    of the current request lifecycle.
-      @sponsor_summary_text[sprint_label] = if override_summary.present?
-                                              override_summary
-                                            else
-                                              "#{sprint_label} sponsor CSV uploaded. Summary has not been generated yet. Re-upload to retry analysis."
-                                            end
-      @sponsor_details[sprint_label] = build_sponsor_details(parsed: parsed)
+        parsed = parse_sponsor_csv(attachment: survey.csv)
+        @sponsor_rows_count[team.id][sprint_label] = parsed[:rows].size
+
+        if parsed[:errors].present?
+          next
+        end
+
+        @sponsor_csv_attached[team.id][sprint_label] = true
+
+        @sponsor_summary_text[team.id][sprint_label] = if override_summary.present?
+                                                         override_summary
+                                                       elsif survey.summary_text.present?
+                                                         survey.summary_text
+                                                       else
+                                                         "#{sprint_label} sponsor CSV uploaded. Summary has not been generated yet. Re-upload to retry analysis."
+                                                       end
+        @sponsor_details[team.id][sprint_label] = build_sponsor_details(parsed: parsed)
+      end
     end
   end
 

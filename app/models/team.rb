@@ -2,6 +2,7 @@ class Team < ApplicationRecord
   belongs_to :semester
   has_many :student_teams, dependent: :destroy
   has_many :students, through: :student_teams
+  has_many :sponsor_surveys, dependent: :destroy
 
   validates :name, presence: true
   # Possible for there to be multiple same team name - go by semester

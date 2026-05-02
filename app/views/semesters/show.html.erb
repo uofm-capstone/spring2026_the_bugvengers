@@ -175,8 +175,8 @@
 
         event.preventDefault();
 
-        const sprintKey = form.dataset.sponsorSprintKey;
-        const control = sprintKey ? document.querySelector(`[data-sponsor-control="${sprintKey}"]`) : null;
+        const sponsorKey = form.dataset.sponsorKey || form.dataset.sponsorSprintKey;
+        const control = sponsorKey ? document.querySelector(`[data-sponsor-control="${sponsorKey}"]`) : null;
         const fileInput = form.querySelector('input[name="sponsor_csv"]');
         const feedbackEl = control ? control.querySelector('[data-sponsor-upload-feedback]') : null;
         const hintEl = control ? control.querySelector('[data-sponsor-upload-hint]') : null;

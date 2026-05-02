@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.0].define(version: 2026_04_23_203518) do
+ActiveRecord::Schema[7.0].define(version: 2026_05_02_123000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -80,8 +80,33 @@ ActiveRecord::Schema[7.0].define(version: 2026_04_23_203518) do
     t.datetime "updated_at", null: false
     t.string "description"
     t.bigint "user_id"
+    t.text "sponsor_summary_sprint_2"
+    t.text "sponsor_summary_sprint_3"
+    t.text "sponsor_summary_sprint_4"
+    t.string "sponsor_sentiment_sprint_2"
+    t.string "sponsor_sentiment_sprint_3"
+    t.string "sponsor_sentiment_sprint_4"
+    t.datetime "sponsor_summary_generated_at_sprint_2"
+    t.datetime "sponsor_summary_generated_at_sprint_3"
+    t.datetime "sponsor_summary_generated_at_sprint_4"
+    t.string "sponsor_summary_model_sprint_2"
+    t.string "sponsor_summary_model_sprint_3"
+    t.string "sponsor_summary_model_sprint_4"
     t.index ["semester", "year"], name: "index_semesters_on_semester_and_year", unique: true
     t.index ["user_id"], name: "index_semesters_on_user_id"
+  end
+
+  create_table "sponsor_surveys", force: :cascade do |t|
+    t.bigint "team_id", null: false
+    t.integer "sprint_number", null: false
+    t.text "summary_text"
+    t.string "sentiment"
+    t.string "summary_model"
+    t.datetime "summary_generated_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["team_id", "sprint_number"], name: "index_sponsor_surveys_on_team_id_and_sprint_number", unique: true
+    t.index ["team_id"], name: "index_sponsor_surveys_on_team_id"
   end
 
   create_table "sprints", force: :cascade do |t|
@@ -152,7 +177,6 @@ ActiveRecord::Schema[7.0].define(version: 2026_04_23_203518) do
     t.boolean "is_active", default: false, null: false
     t.boolean "temp_password_changed", default: false, null: false
     t.datetime "last_login_at"
-    t.datetime "date_joined"
     t.index ["email"], name: "index_users_on_email", unique: true
     t.index ["reset_password_token"], name: "index_users_on_reset_password_token", unique: true
   end
@@ -166,6 +190,7 @@ ActiveRecord::Schema[7.0].define(version: 2026_04_23_203518) do
   add_foreign_key "repositories", "teams"
   add_foreign_key "repositories", "users"
   add_foreign_key "semesters", "users"
+  add_foreign_key "sponsor_surveys", "teams"
   add_foreign_key "sprints", "semesters"
   add_foreign_key "student_teams", "students"
   add_foreign_key "student_teams", "teams"

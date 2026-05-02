@@ -1,6 +1,7 @@
 # app/controllers/semesters_controller.rb
 class SemestersController < ApplicationController
   require "digest"
+  require "fileutils"
   require 'text'
   require 'timeout'
   GITHUB_SCORE_WEIGHTS = {
@@ -343,7 +344,7 @@ end
 
     if ActiveModel::Type::Boolean.new.cast(params[:force_refresh])
       session[:status_force_refresh_once] = true
-      return redirect_to semester_status_path(@semester, debug: params[:debug]), notice: "GitHub metrics will be refreshed now."
+      return redirect_to semester_status_path(@semester, debug: params[:debug]), notice: "Status snapshot update requested."
     end
 
     session[:last_viewed_semester_id] = @semester.id
@@ -358,11 +359,32 @@ end
     session[:last_viewed_semester_id] = @semester.id
     @force_github_refresh = session.delete(:status_force_refresh_once) ||
                 ActiveModel::Type::Boolean.new.cast(params[:force_refresh])
-
-    build_status_payload!
     @show_github_inspector = current_user.admin? && params[:debug] == "github"
 
-    render partial: "semesters/status_content"
+    unless status_snapshot_cache_enabled?
+      build_status_payload!
+      return render partial: "semesters/status_content"
+    end
+
+    cache_key = status_snapshot_cache_key
+
+    if @force_github_refresh
+      build_status_payload!
+      @status_snapshot_built_at = Time.current
+      rendered_content = render_to_string(partial: "semesters/status_content")
+      Rails.cache.write(cache_key, rendered_content)
+      return render html: rendered_content.html_safe
+    end
+
+    cached_html = Rails.cache.read(cache_key)
+    if cached_html.present?
+      Rails.logger.info("Status snapshot cache hit for semester #{@semester.id}")
+      return render html: cached_html.html_safe
+    end
+
+    Rails.logger.info("Status snapshot cache miss for semester #{@semester.id}")
+
+    render partial: "semesters/status_content_cache_prompt"
   rescue StandardError => e
     Rails.logger.error("Status content build failed for semester #{params[:id]}: #{e.class} - #{e.message}")
     render partial: "semesters/status_content_timeout"
@@ -642,7 +664,7 @@ end
   end
 
   def build_status_payload!
-    @teams = @semester.teams
+    @teams = @semester.teams.includes(:students)
     @sprint_list = @semester.sprints.pluck(:name)
     @flags = {}
 
@@ -665,103 +687,139 @@ end
     @github_inspector = {}
     @status_metrics = {}
 
-    @teams.each do |team|
-      team_service = GithubService.new(team: team, user: current_user)
-      team_cache_version = status_cache_version_for(team: team)
-      board_health = safe_board_health(
-        team_service: team_service,
-        team: team,
-        cache_version: team_cache_version,
-        force_refresh: @force_github_refresh
-      )
-      project_cards = board_health.cards
-      repo = team_service.parse_repo_url(team.repo_url)
-      sprint_cards_by_name = {}
-      github_metrics_by_sprint = {}
+    mutex = Mutex.new
+    work_queue = Queue.new
+    @teams.each { |team| work_queue << team }
 
-      @team_project_data[team.id] = project_cards
-      @team_board_health[team.id] = board_health
-      @team_sprint_metrics[team.id] = {}
-      @status_metrics[team.id] = {}
+    parallelism = ENV.fetch("STATUS_PARALLELISM", 4).to_i
+    worker_count = [parallelism, @teams.size].min
 
-      inspector_sprints = {}
+    workers = worker_count.times.map do
+      Thread.new do
+        ActiveRecord::Base.connection_pool.with_connection do
+          loop do
+            team = work_queue.pop(true) rescue nil
+            break unless team
 
-      @sprints.each do |sprint|
-        sprint_cards = cards_for_sprint(project_cards, sprint)
-        sprint_cards_by_name[sprint.name] = sprint_cards
+            team_payload = build_team_status_payload(team)
 
-        github_metrics = safe_github_sprint_metrics(
-          team_service: team_service,
-          repo: repo,
-          sprint: sprint,
-          students: team.students,
-          team: team,
-          cache_version: status_cache_version_for(team: team, sprint: sprint),
-          force_refresh: @force_github_refresh
-        )
-        github_metrics_by_sprint[sprint.name] = github_metrics
-
-        team_metric = build_team_sprint_metrics(
-          sprint_cards: sprint_cards,
-          board_health: board_health,
-          sprint: sprint,
-          students: team.students,
-          github_metrics: github_metrics
-        )
-        @team_sprint_metrics[team.id][sprint.name] = team_metric
-
-        inspector_sprints[sprint.name] = {
-          start_date: sprint.start_date,
-          end_date: sprint.end_date,
-          progress_deadline: sprint.progress_deadline,
-          total_cards: team_metric[:total_cards],
-          total_estimate: team_metric[:estimated_hours],
-          total_spent: team_metric[:time_spent_hours],
-          cards_missing_spent: team_metric[:cards_missing_time_spent],
-          github_repo: repo,
-          github_scores: team_metric[:github],
-          card_time_samples: sprint_cards.map { |card| card_time_sample(card) }
-        }
-      end
-
-      team.students.each do |student|
-        @status_metrics[team.id][student.id] = {}
-
-        @sprints.each do |sprint|
-          sprint_github_metrics = github_metrics_by_sprint[sprint.name] || {}
-          @status_metrics[team.id][student.id][sprint.name] = build_live_status_metrics(
-            sprint_cards: sprint_cards_by_name[sprint.name],
-            board_health: board_health,
-            student: student,
-            sprint: sprint,
-            github_student_metrics: sprint_github_metrics.dig(:per_student, student.github_username),
-            team_missing_data_flags: sprint_github_metrics[:missing_data_flags],
-            team_github_available: sprint_github_metrics[:data_available]
-          )
+            mutex.synchronize do
+              @team_project_data[team.id] = team_payload[:project_cards]
+              @team_board_health[team.id] = team_payload[:board_health]
+              @team_sprint_metrics[team.id] = team_payload[:team_sprint_metrics]
+              @status_metrics[team.id] = team_payload[:status_metrics]
+              @team_status_overview << team_payload[:team_status_overview]
+              @github_inspector[team.id] = team_payload[:github_inspector]
+            end
+          end
         end
       end
-
-      @team_status_overview << {
-        team_id: team.id,
-        team_name: team.name,
-        students_count: team.students.count,
-        any_at_risk: @team_sprint_metrics[team.id].values.any? { |metric| metric[:at_risk] },
-        any_missing_sprint_done: @team_sprint_metrics[team.id].values.any? { |metric| metric[:missing_sprint_done] },
-        at_risk_reason_preview: @team_sprint_metrics[team.id].values.flat_map { |metric| metric[:at_risk_reasons] }.uniq.first(2),
-        sprint_metrics: @team_sprint_metrics[team.id]
-      }
-
-      @github_inspector[team.id] = {
-        project_url: team.project_board_url,
-        status_options: board_health.status_options,
-        card_counts: @service.get_card_count_per_column(project_cards),
-        sprint_payloads: inspector_sprints
-      }
     end
+
+    workers.each(&:join)
 
     @team_overview_by_id = @team_status_overview.index_by { |summary| summary[:team_id] }
     build_sponsor_ui_payload!
     build_sponsor_scores_by_team!
+  end
+
+  def build_team_status_payload(team)
+    team_service = GithubService.new(team: team, user: current_user)
+    team_cache_version = status_cache_version_for(team: team)
+    board_health = safe_board_health(
+      team_service: team_service,
+      team: team,
+      cache_version: team_cache_version,
+      force_refresh: @force_github_refresh
+    )
+    project_cards = board_health.cards
+    repo = team_service.parse_repo_url(team.repo_url)
+    sprint_cards_by_name = {}
+    github_metrics_by_sprint = {}
+    team_sprint_metrics = {}
+    status_metrics = {}
+    inspector_sprints = {}
+
+    @sprints.each do |sprint|
+      sprint_cards = cards_for_sprint(project_cards, sprint)
+      sprint_cards_by_name[sprint.name] = sprint_cards
+
+      github_metrics = safe_github_sprint_metrics(
+        team_service: team_service,
+        repo: repo,
+        sprint: sprint,
+        students: team.students,
+        team: team,
+        cache_version: status_cache_version_for(team: team, sprint: sprint),
+        force_refresh: @force_github_refresh
+      )
+      github_metrics_by_sprint[sprint.name] = github_metrics
+
+      team_metric = build_team_sprint_metrics(
+        sprint_cards: sprint_cards,
+        board_health: board_health,
+        sprint: sprint,
+        students: team.students,
+        github_metrics: github_metrics
+      )
+      team_sprint_metrics[sprint.name] = team_metric
+
+      inspector_sprints[sprint.name] = {
+        start_date: sprint.start_date,
+        end_date: sprint.end_date,
+        progress_deadline: sprint.progress_deadline,
+        total_cards: team_metric[:total_cards],
+        total_estimate: team_metric[:estimated_hours],
+        total_spent: team_metric[:time_spent_hours],
+        cards_missing_spent: team_metric[:cards_missing_time_spent],
+        github_repo: repo,
+        github_scores: team_metric[:github],
+        card_time_samples: sprint_cards.map { |card| card_time_sample(card) }
+      }
+    end
+
+    team.students.each do |student|
+      status_metrics[student.id] = {}
+
+      @sprints.each do |sprint|
+        sprint_github_metrics = github_metrics_by_sprint[sprint.name] || {}
+        status_metrics[student.id][sprint.name] = build_live_status_metrics(
+          sprint_cards: sprint_cards_by_name[sprint.name],
+          board_health: board_health,
+          student: student,
+          sprint: sprint,
+          github_student_metrics: sprint_github_metrics.dig(:per_student, student.github_username),
+          team_missing_data_flags: sprint_github_metrics[:missing_data_flags],
+          team_github_available: sprint_github_metrics[:data_available]
+        )
+      end
+    end
+
+    team_status_overview = {
+      team_id: team.id,
+      team_name: team.name,
+      students_count: team.students.count,
+      any_at_risk: team_sprint_metrics.values.any? { |metric| metric[:at_risk] },
+      any_missing_sprint_done: team_sprint_metrics.values.any? { |metric| metric[:missing_sprint_done] },
+      at_risk_reason_preview: team_sprint_metrics.values.flat_map { |metric| metric[:at_risk_reasons] }.uniq.first(2),
+      sprint_metrics: team_sprint_metrics
+    }
+
+    github_inspector = {
+      project_url: team.project_board_url,
+      status_options: board_health.status_options,
+      card_counts: @service.get_card_count_per_column(project_cards),
+      sprint_payloads: inspector_sprints
+    }
+
+    {
+      project_cards: project_cards,
+      board_health: board_health,
+      team_sprint_metrics: team_sprint_metrics,
+      status_metrics: status_metrics,
+      team_status_overview: team_status_overview,
+      github_inspector: github_inspector
+    }
   end
 
   def build_sponsor_scores_by_team!
@@ -848,7 +906,7 @@ end
   end
 
   def safe_board_health(team_service:, team:, cache_version: nil, force_refresh: false)
-    Timeout.timeout(10) do
+    Timeout.timeout(5) do
       team_service.board_health(
         team.project_board_url,
         cache_version: cache_version,
@@ -864,7 +922,7 @@ end
   end
 
   def safe_github_sprint_metrics(team_service:, repo:, sprint:, students:, team:, cache_version: nil, force_refresh: false)
-    Timeout.timeout(8) do
+    Timeout.timeout(4) do
       build_github_sprint_metrics(
         team_service: team_service,
         repo: repo,
@@ -876,10 +934,26 @@ end
     end
   rescue Timeout::Error
     Rails.logger.warn("GitHub sprint metrics timed out for team #{team.id}, sprint #{sprint.name}")
-    empty_team_github_metrics(repo: repo, missing_data_flags: ["github_query_timeout"])
+    build_last_commit_only(
+      team_service: team_service,
+      repo: repo,
+      sprint: sprint,
+      students: students,
+      cache_version: cache_version,
+      force_refresh: force_refresh,
+      missing_data_flags: ["github_query_timeout"]
+    )
   rescue StandardError => e
     Rails.logger.warn("GitHub sprint metrics failed for team #{team.id}, sprint #{sprint.name}: #{e.class} - #{e.message}")
-    empty_team_github_metrics(repo: repo, missing_data_flags: ["github_query_failed"])
+    build_last_commit_only(
+      team_service: team_service,
+      repo: repo,
+      sprint: sprint,
+      students: students,
+      cache_version: cache_version,
+      force_refresh: force_refresh,
+      missing_data_flags: ["github_query_failed"]
+    )
   end
 
   def build_live_status_metrics(
@@ -894,9 +968,9 @@ end
     columns = @service.get_card_count_per_column(sprint_cards)
     sprint_done_count = sprint_cards.count { |card| done_in_sprint_status?(card.status, sprint.name) }
     done_in_any_sprint_count = sprint_cards.count { |card| done_in_any_sprint_status?(card.status) }
-    current_board_done_count = columns["Done"]
-    archived_count = columns["Archived"]
-    active_now_count = columns["Backlog"] + columns["Todo"] + columns["To Do"] + columns["In Progress"]
+    current_board_done_count = count_by_status_group(columns) { |status| done_status?(status) }
+    archived_count = count_by_status_group(columns) { |status| archived_status?(status) }
+    active_now_count = count_by_status_group(columns) { |status| active_status?(status) }
     total_count = columns.values.sum
 
     per_student_column_counts = Hash.new(0)
@@ -905,7 +979,7 @@ end
     time_spent_hours = 0
 
     sprint_cards.each do |card|
-      next unless card.assignees.include?(student.github_username)
+      next unless assignee_matches_student?(card, student)
 
       assigned_card_count += 1
       status = card.status || "Unspecified"
@@ -914,14 +988,14 @@ end
       time_spent_hours += spent_value(card)
     end
 
-    done_status_total = per_student_column_counts["Done"] + per_student_column_counts["Archived"] +
+    done_status_total = count_by_status_group(per_student_column_counts) { |status| done_status?(status) || archived_status?(status) } +
                         per_student_column_counts.select { |status_name, _count| done_in_any_sprint_status?(status_name) }.values.sum
 
     student_done_scope_cards = sprint_cards.select do |card|
-      next false unless card.assignees.include?(student.github_username)
+      next false unless assignee_matches_student?(card, student)
 
       status = card.status.to_s
-      done_in_any_sprint_status?(status) || status.casecmp("Done").zero? || status.casecmp("Archived").zero?
+      done_in_any_sprint_status?(status) || done_status?(status) || archived_status?(status)
     end
     student_done_scope_count = student_done_scope_cards.size
     student_done_with_estimate_pct = percentage(
@@ -997,9 +1071,9 @@ end
 
     {
       fsd: {
-        backlog: per_student_column_counts["Backlog"],
-        todo: per_student_column_counts["Todo"] + per_student_column_counts["To Do"],
-        in_progress: per_student_column_counts["In Progress"],
+        backlog: count_by_status_group(per_student_column_counts) { |status| backlog_status?(status) },
+        todo: count_by_status_group(per_student_column_counts) { |status| todo_status?(status) },
+        in_progress: count_by_status_group(per_student_column_counts) { |status| in_progress_status?(status) },
         done: done_status_total
       },
       fa: {
@@ -1052,9 +1126,9 @@ end
     columns = @service.get_card_count_per_column(sprint_cards)
     sprint_done_count = sprint_cards.count { |card| done_in_sprint_status?(card.status, sprint.name) }
     done_in_any_sprint_count = sprint_cards.count { |card| done_in_any_sprint_status?(card.status) }
-    current_board_done_count = columns["Done"]
-    archived_count = columns["Archived"]
-    active_now_count = columns["Backlog"] + columns["Todo"] + columns["To Do"] + columns["In Progress"]
+    current_board_done_count = count_by_status_group(columns) { |status| done_status?(status) }
+    archived_count = count_by_status_group(columns) { |status| archived_status?(status) }
+    active_now_count = count_by_status_group(columns) { |status| active_status?(status) }
     total_count = columns.values.sum
 
     estimated_hours = sprint_cards.sum { |card| estimate_value(card) }
@@ -1064,12 +1138,12 @@ end
     end
     in_current_sprint = sprint_in_progress?(sprint)
 
-    done_status_total = columns["Done"] + columns["Archived"] +
+    done_status_total = count_by_status_group(columns) { |status| done_status?(status) || archived_status?(status) } +
                         columns.select { |status_name, _count| done_in_any_sprint_status?(status_name) }.values.sum
 
     done_scope_cards = sprint_cards.select do |card|
       status = card.status.to_s
-      done_in_any_sprint_status?(status) || status.casecmp("Done").zero? || status.casecmp("Archived").zero?
+      done_in_any_sprint_status?(status) || done_status?(status) || archived_status?(status)
     end
 
     done_scope_count = done_scope_cards.size
@@ -1121,9 +1195,9 @@ end
     {
       sprint_name: sprint.name,
       archived_column_exists: board_health.archived_column_exists,
-      backlog_cards: columns["Backlog"],
-      todo_cards: columns["Todo"] + columns["To Do"],
-      in_progress_cards: columns["In Progress"],
+      backlog_cards: count_by_status_group(columns) { |status| backlog_status?(status) },
+      todo_cards: count_by_status_group(columns) { |status| todo_status?(status) },
+      in_progress_cards: count_by_status_group(columns) { |status| in_progress_status?(status) },
       done_cards: done_status_total,
       current_board_done_cards: current_board_done_count,
       sprint_done_cards: sprint_done_count,
@@ -1269,6 +1343,62 @@ end
     empty_team_github_metrics(repo: repo, missing_data_flags: ["github_query_failed"])
   end
 
+  def build_last_commit_only(team_service:, repo:, sprint:, students:, cache_version: nil, force_refresh: false, missing_data_flags: [])
+    return empty_team_github_metrics(missing_data_flags: ["repo_missing"]) if repo.blank?
+    return empty_team_github_metrics(repo: repo, missing_data_flags: ["token_unavailable"]) unless team_service.available?
+
+    start_date = sprint.start_date || Date.current.beginning_of_month
+    end_date = sprint.end_date || Date.current.end_of_month
+    fallback_end_date = end_date.respond_to?(:to_date) ? end_date.to_date : Date.current
+    fallback_start_date = fallback_end_date - 180.days
+
+    last_commit_at_by_user = team_service.last_commit_at_by_user(
+      repo,
+      start_date,
+      end_date,
+      cache_version: cache_version,
+      force_refresh: force_refresh
+    )
+    fallback_last_commit_at_by_user = team_service.last_commit_at_by_user(
+      repo,
+      fallback_start_date,
+      fallback_end_date,
+      cache_version: "#{cache_version}:fallback_last_commit",
+      force_refresh: force_refresh
+    )
+
+    per_student = {}
+    students.each do |student|
+      username = student.github_username.to_s
+      next if username.blank?
+
+      last_commit_at = lookup_user_metric(last_commit_at_by_user, username) ||
+                       lookup_user_metric(fallback_last_commit_at_by_user, username)
+
+      per_student[username] = {
+        data_available: true,
+        missing_data_flags: [],
+        last_commit_at: last_commit_at,
+        cbp: { commit_count: 0, lines_added: 0, lines_removed: 0, lines_changed: 0 },
+        pr: { opened_count: 0, merged_count: 0, open_count: 0, avg_merge_hours: 0.0 },
+        review: { review_count: 0, approvals: 0, changes_requested: 0 }
+      }
+    end
+
+    {
+      data_available: true,
+      repo: repo,
+      cbp: { total_commits: 0, total_lines_changed: 0, active_contributors: 0 },
+      pr: { opened_count: 0, merged_count: 0, open_count: 0, avg_merge_hours: 0.0 },
+      review: { review_count: 0, approvals: 0, changes_requested: 0 },
+      missing_data_flags: Array(missing_data_flags),
+      per_student: per_student
+    }
+  rescue StandardError => e
+    Rails.logger.warn("Last commit fallback failed for team repo #{repo}: #{e.class} - #{e.message}")
+    empty_team_github_metrics(repo: repo, missing_data_flags: Array(missing_data_flags))
+  end
+
   def lookup_user_metric(metrics, username)
     return nil if metrics.blank? || username.blank?
 
@@ -1311,6 +1441,20 @@ end
     end
 
     parts.join("|")
+  end
+
+  def status_snapshot_cache_enabled?
+    !Rails.cache.class.name.include?("NullStore")
+  end
+
+  def status_snapshot_cache_key
+    [
+      "semester_status_snapshot_html",
+      "manual:v1",
+      @semester.id,
+      "debug:#{params[:debug]}",
+      "inspector:#{@show_github_inspector ? 1 : 0}"
+    ]
   end
 
   def empty_student_github_metrics(missing_data_flags: ["repo_or_token_missing"], data_available: false)
@@ -1513,13 +1657,64 @@ end
     matching_cards = cards.select { |card| card_matches_sprint?(card, sprint) }
     return matching_cards if matching_cards.any?
 
-    return [] unless sprint_in_progress?(sprint) || latest_sprint_in_semester?(sprint)
+    return [] unless latest_sprint_in_semester?(sprint)
 
-    # Fallback for active/latest sprint when cards are not explicitly tagged.
-    # Older sprints still require explicit sprint tagging.
+    # For the latest sprint, include only untagged active/done cards as fallback.
     cards.select do |card|
-      status = card.status.to_s
-      %w[Backlog Todo To\ Do In\ Progress Done].include?(status)
+      status = card.status
+      next false unless backlog_status?(status) || todo_status?(status) || in_progress_status?(status) || done_status?(status)
+
+      card_sprint_number(card).blank?
+    end
+  end
+
+  def assignee_matches_student?(card, student)
+    return false if card.blank? || student.blank?
+
+    assignees = Array(card.assignees).map(&:to_s).reject(&:blank?)
+    return false if assignees.empty?
+
+    target_username = normalized_github_username(student.github_username)
+    if target_username.present?
+      normalized_assignees = assignees.map { |value| normalized_github_username(value) }
+      return true if normalized_assignees.include?(target_username)
+    end
+
+    student_name = student.full_name.to_s.strip.downcase
+    student_name.present? && assignees.any? { |value| value.to_s.strip.downcase == student_name }
+  end
+
+  def normalize_status_token(status)
+    status.to_s.downcase.gsub(/[^a-z0-9]/, "")
+  end
+
+  def backlog_status?(status)
+    normalize_status_token(status) == "backlog"
+  end
+
+  def todo_status?(status)
+    normalize_status_token(status) == "todo"
+  end
+
+  def in_progress_status?(status)
+    normalize_status_token(status) == "inprogress"
+  end
+
+  def done_status?(status)
+    normalize_status_token(status) == "done"
+  end
+
+  def archived_status?(status)
+    normalize_status_token(status) == "archived"
+  end
+
+  def active_status?(status)
+    backlog_status?(status) || todo_status?(status) || in_progress_status?(status)
+  end
+
+  def count_by_status_group(count_map)
+    count_map.sum do |status, count|
+      yield(status) ? count.to_i : 0
     end
   end
 
@@ -1542,12 +1737,22 @@ end
     sprint_number = sprint.name.to_s[/\d+/]
     return false if sprint_number.blank?
 
-    card.fields.any? do |field_name, value|
-      next false unless field_name.to_s.match?(/sprint|iteration/i)
+    card_sprint_number(card) == sprint_number
+  end
 
-      normalized = value.to_s.downcase
-      normalized.include?("sprint #{sprint_number}") || normalized == sprint_number
+  def card_sprint_number(card)
+    return nil if card.blank?
+
+    fields = card.fields || {}
+    fields.each do |field_name, value|
+      next unless field_name.to_s.match?(/sprint|iteration/i)
+
+      value_str = value.to_s.downcase
+      number = value_str[/\d+/]
+      return number if number.present?
     end
+
+    nil
   end
 
   # Permits only the allowed semester params for strong parameter safety.

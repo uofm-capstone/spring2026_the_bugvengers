@@ -623,24 +623,37 @@ class GithubService
     cache_key = [repo, sha]
     return @commit_details_cache[cache_key] if @commit_details_cache.key?(cache_key)
 
-    @commit_details_cache[cache_key] = @client.commit(repo, sha)
+    @commit_details_cache[cache_key] = cache_fetch(
+      "commit_details",
+      repo,
+      sha,
+      expires_in: 12.hours
+    ) do
+      @client.commit(repo, sha)
+    end
   end
 
   def pull_requests(repo)
     return @pull_requests_cache[repo] if @pull_requests_cache.key?(repo)
 
-    pulls = []
-    page = 1
+    @pull_requests_cache[repo] = cache_fetch(
+      "pull_requests",
+      repo,
+      expires_in: 10.minutes
+    ) do
+      pulls = []
+      page = 1
 
-    loop do
-      batch = @client.pull_requests(repo, state: "all", per_page: 100, page: page)
-      break if batch.blank?
+      loop do
+        batch = @client.pull_requests(repo, state: "all", per_page: 100, page: page)
+        break if batch.blank?
 
-      pulls.concat(batch)
-      page += 1
+        pulls.concat(batch)
+        page += 1
+      end
+
+      pulls
     end
-
-    @pull_requests_cache[repo] = pulls
   rescue Octokit::NotFound
     @logger.warn("Repository not found for pull request query: #{repo}")
     @pull_requests_cache[repo] = []
@@ -650,18 +663,25 @@ class GithubService
     cache_key = [repo, pull_number]
     return @pull_request_reviews_cache[cache_key] if @pull_request_reviews_cache.key?(cache_key)
 
-    reviews = []
-    page = 1
+    @pull_request_reviews_cache[cache_key] = cache_fetch(
+      "pull_request_reviews",
+      repo,
+      pull_number,
+      expires_in: 10.minutes
+    ) do
+      reviews = []
+      page = 1
 
-    loop do
-      batch = @client.pull_request_reviews(repo, pull_number, per_page: 100, page: page)
-      break if batch.blank?
+      loop do
+        batch = @client.pull_request_reviews(repo, pull_number, per_page: 100, page: page)
+        break if batch.blank?
 
-      reviews.concat(batch)
-      page += 1
+        reviews.concat(batch)
+        page += 1
+      end
+
+      reviews
     end
-
-    @pull_request_reviews_cache[cache_key] = reviews
   rescue Octokit::NotFound
     @pull_request_reviews_cache[cache_key] = []
   end

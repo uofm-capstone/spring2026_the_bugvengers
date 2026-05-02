@@ -145,6 +145,8 @@ class SponsorSummaryService
     {
       ok: true,
       summary_text: summary_text,
+      sentiment: formatted[:sentiment],
+      model: llm_service.model_name,
       rows_count: rows_count,
       message: "Sponsor summary generated successfully.",
       error_code: nil

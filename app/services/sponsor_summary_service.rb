@@ -33,6 +33,7 @@ class SponsorSummaryService
     semester:,
     sprint_number:,
     attachment: nil,
+    source: nil,
     team: nil,
     parser_class: CSVSurveyParserService,
     llm_service_builder: nil,
@@ -45,6 +46,7 @@ class SponsorSummaryService
     # branching bugs when controller params arrive as strings.
     @sprint_number = sprint_number.to_s.strip
     @attachment = attachment
+    @source = source
     @team = team
     # Parser and LLM builder are injectable to keep tests fast and isolated.
     @parser_class = parser_class
@@ -61,10 +63,11 @@ class SponsorSummaryService
   # - message: short operator-facing message for upload response feedback
   # - error_code: machine-friendly classification for logging/metrics
   def generate
-    # Step 1: Select the correct ActiveStorage attachment for the sprint.
-    # Invalid sprint values should fail gracefully and never raise into controller.
-    attachment = @attachment || attachment_for_sprint
-    unless attachment&.attached?
+    # Step 1: Select the best available CSV source for this request.
+    # We prefer the direct upload source when the caller provides one so the
+    # summary pipeline does not depend on reopening a just-created blob.
+    source = @source || @attachment || attachment_for_sprint
+    unless source.present?
       return failure_result(
         error_code: "missing_attachment",
         message: "No sponsor CSV is attached for this sprint.",
@@ -74,7 +77,7 @@ class SponsorSummaryService
 
     # Step 3: Parse through the shared CSV parser so summary logic follows the
     # same column/normalization rules already used by the Questions modal.
-    parsed = parse_attachment(attachment)
+    parsed = parse_source(source)
     rows_count = parsed[:rows].to_a.size
 
     if @team
@@ -184,10 +187,25 @@ class SponsorSummaryService
 
   # Parser is executed against the opened attachment IO so large files do not
   # need to be copied around in memory.
-  def parse_attachment(attachment)
-    attachment.open do |file|
-      @parser_class.new(file: file).parse
+  def parse_source(source)
+    if source.respond_to?(:read)
+      source.rewind if source.respond_to?(:rewind)
+      @parser_class.new(file: source).parse
+    elsif source.respond_to?(:open)
+      source.open do |file|
+        @parser_class.new(file: file).parse
+      end
+    else
+      attachment_for_sprint.open do |file|
+        @parser_class.new(file: file).parse
+      end
     end
+  rescue ActiveStorage::FileNotFoundError
+    failure_result(
+      error_code: "missing_attachment_file",
+      message: "Sponsor CSV file could not be reopened. Please re-upload the CSV.",
+      rows_count: 0
+    )
   end
 
   def filter_parsed_for_team(parsed, team)
@@ -204,6 +222,11 @@ class SponsorSummaryService
       row_team = row[:q1_team].to_s.strip
       row_team.casecmp(team_name).zero?
     end
+
+    # Some sponsor exports only contain one team's responses or use a different
+    # label format. In that case, keep the original parsed data instead of
+    # treating the upload as empty.
+    return parsed if respondents.blank? && rows.blank? && Array(parsed[:respondents]).present?
 
     parsed.merge(respondents: respondents, rows: rows)
   end

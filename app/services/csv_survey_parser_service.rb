@@ -39,12 +39,16 @@ class CSVSurveyParserService
     raw_rows = parse_rows(errors)
     return empty_result(warnings: warnings, errors: errors) if raw_rows.empty?
 
-    # Qualtrics export convention:
-    # row 1 = machine headers, row 2 = human-readable question text,
-    # row 3 = ImportId metadata, row 4+ = actual responses.
+    # Support both Qualtrics-style exports and simpler sponsor CSVs.
+    # Qualtrics exports typically include a second metadata row and an ImportId row.
     headers = raw_rows[0].map { |h| h.to_s.strip }
-    question_row = raw_rows[1] || []
-    data_rows = raw_rows.drop(3)
+    qualtrics_export = raw_rows[2].present? && raw_rows[2].any? { |value| value.to_s.match?(/importid/i) }
+    question_row = if qualtrics_export
+      raw_rows[1] || []
+    else
+      headers
+    end
+    data_rows = qualtrics_export ? raw_rows.drop(3) : raw_rows.drop(1)
 
     if headers.empty?
       errors << "Missing header row"

@@ -442,6 +442,8 @@ end
     elsif attachment_name.nil?
       message = "Invalid sprint for sponsor CSV upload."
     elsif params[:sponsor_csv].present?
+      uploaded_csv_source = params[:sponsor_csv].tempfile.dup
+      uploaded_csv_source.rewind if uploaded_csv_source.respond_to?(:rewind)
       survey = team.sponsor_surveys.find_or_initialize_by(sprint_number: sprint_number)
       survey.csv.attach(params[:sponsor_csv])
       success = survey.csv.attached?
@@ -454,6 +456,7 @@ end
         summary_result = generate_sponsor_summary(
           sprint_number: sprint_number,
           attachment: survey.csv,
+          source: uploaded_csv_source,
           team: team
         )
 
@@ -486,6 +489,7 @@ end
 
     # Upload response can include one-off summary text for this request only.
     # This keeps summary rendering transient and avoids cross-page persistence.
+    @teams = @semester.teams
     @sponsor_summary_overrides = { team&.id => { sprint_label => summary_override_text } }
     build_sponsor_ui_payload!
 
@@ -627,11 +631,12 @@ end
 
   # Executes parse + LLM summary generation through SponsorSummaryService.
   # Summary storage is handled separately in session-scoped cache helpers.
-  def generate_sponsor_summary(sprint_number:, attachment: nil, team: nil)
+  def generate_sponsor_summary(sprint_number:, attachment: nil, source: nil, team: nil)
     SponsorSummaryService.new(
       semester: @semester,
       sprint_number: sprint_number,
       attachment: attachment,
+      source: source,
       team: team
     ).generate
   rescue StandardError => e
@@ -873,6 +878,7 @@ end
 
   def build_sponsor_ui_payload!
     sprint_labels = ["Sprint 2", "Sprint 3", "Sprint 4"]
+    @teams ||= @semester.teams
 
     @sponsor_csv_attached = Hash.new { |hash, key| hash[key] = {} }
     @sponsor_rows_count = Hash.new { |hash, key| hash[key] = {} }
@@ -902,6 +908,7 @@ end
 
         @sponsor_csv_attached[team.id][sprint_label] = true
 
+        override_summary = @sponsor_summary_overrides&.dig(team.id, sprint_label)
         @sponsor_summary_text[team.id][sprint_label] = if override_summary.present?
                                                          override_summary
                                                        elsif survey.summary_text.present?

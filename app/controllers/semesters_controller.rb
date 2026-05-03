@@ -1468,9 +1468,18 @@ end
       "semester_status_snapshot_html",
       "manual:v1",
       @semester.id,
+      "sponsor:#{status_sponsor_cache_stamp}",
       "debug:#{params[:debug]}",
       "inspector:#{@show_github_inspector ? 1 : 0}"
     ]
+  end
+
+  # Includes sponsor-survey recency in snapshot cache key so uploaded CSVs
+  # are visible after page reload instead of showing stale cached HTML.
+  def status_sponsor_cache_stamp
+    scope = SponsorSurvey.joins(:team).where(teams: { semester_id: @semester.id })
+    latest_updated_at = scope.maximum(:updated_at)&.to_i || 0
+    "#{scope.count}-#{latest_updated_at}"
   end
 
   def empty_student_github_metrics(missing_data_flags: ["repo_or_token_missing"], data_available: false)

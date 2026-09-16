@@ -1,5 +1,11 @@
 # README
 
+# Team Tag 'Em Up Fall 2026 Semester Documents
+* Timesheet: https://livememphis.sharepoint.com/:x:/s/Team-CapstoneTAGProject/IQDdw_lxw4TtSJWD2BivkecSAb2WpsYqB5_Ao46bK7u4cXY?e=gmRjOE
+
+* Team Contract: https://livememphis.sharepoint.com/:w:/s/Team-CapstoneTAGProject/IQDmBFNpFxQtRYYz6TVeYaZyAQG4oucWGhWHR6UNypmnG1s?e=tdhBe2
+
+
 # Team The Bugvengers Fall Semester Documents
 * Timesheet: https://docs.google.com/spreadsheets/d/1ldVO4Gvr_2aZjupZg9wW69blvqsRB30c2dRBAY0WZQE/edit?usp=sharing
 

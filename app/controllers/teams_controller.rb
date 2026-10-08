@@ -7,7 +7,7 @@ class TeamsController < ApplicationController
   def index
     @students = Student.where(semester_id: session[:last_viewed_semester_id]).order(:full_name)
     
-    if current_user.role == "student"
+    if current_user.student?
       @teams = current_user.student ? current_user.student.teams : Team.none
     else
       @teams = Team.where(semester_id: session[:last_viewed_semester_id])
@@ -18,6 +18,7 @@ class TeamsController < ApplicationController
   end
 
   def show
+    authorize! :read, @team
     @team_members = @team.students
     render :show
   end

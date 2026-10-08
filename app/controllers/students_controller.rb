@@ -56,6 +56,7 @@ class StudentsController < ApplicationController
   
   def set_student
     @student = Student.find(params[:id])
+    authorize! :read, @student
   rescue ActiveRecord::RecordNotFound
     redirect_to students_path, alert: "Student not found."
   end
@@ -74,8 +75,11 @@ class StudentsController < ApplicationController
   end
 
   def load_students_for_index
+    if current_user.student?
+      Student.where(id: current_user.student&.id)
+    else
       Student.where(semester_id: session[:last_viewed_semester_id]).order(Arel.sql("LOWER(full_name)"))
-      Student.where(semester_id: session[:last_viewed_semester_id]).order(Arel.sql("LOWER(full_name)"))
+    end
   end
 
   def student_params

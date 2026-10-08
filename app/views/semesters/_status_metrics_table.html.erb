@@ -1,179 +1,406 @@
 <!-- TABLE -->
 <div class="table-responsive team-status-table-wrap">
-  <% rubric_items = ["FS&D", "FA", "TE", "TT", "Last Commit", "PP"] %>
-  <% sponsor_columns = [
-    { sprint: "Sprint 2", label: "Sponsor Response - Sprint 2", css: "sprint-2" },
-    { sprint: "Sprint 3", label: "Sponsor Response - Sprint 3", css: "sprint-3" },
-    { sprint: "Sprint 4", label: "Sponsor Response - Sprint 4", css: "sprint-4" }
-  ] %>
-  <table class="table table-bordered align-middle text-center team-status-table">
-    <thead>
-      <tr>
-        <th class="sticky-col-1" rowspan="2">Team Name</th>
-        <th class="sticky-col-2" rowspan="2">Member</th>
-        <% sprint_list.each do |sprint| %>
-          <th colspan="6" class="sprint-group <%= sprint.parameterize %>"><%= sprint %></th>
-        <% end %>
-        <% sponsor_columns.each do |sponsor_column| %>
-          <th class="sprint-group <%= sponsor_column[:css] %>" rowspan="2"><%= sponsor_column[:label] %></th>
-        <% end %>
-      </tr>
 
-      <tr>
-        <% sprint_list.each do |sprint| %>
-          <% rubric_items.each do |item| %>
-            <% tooltip = case item
-              when "FS&D" then "<strong>Feature Selection and Decomposition</strong><br><b>Metric:</b> Student cards per status in this sprint (Backlog, Todo, In Progress, Done)."
-              when "FA"   then "<strong>Feature Assignments</strong><br><b>Metric:</b> Number of cards assigned to this student in this sprint."
-              when "TE"   then "<strong>Time Estimate</strong><br><b>Metric:</b> Estimated hours for this student's sprint cards."
-              when "TT"   then "<strong>Time Taken</strong><br><b>Metric:</b> Logged hours from Kanban Time Taken / Time Spent fields for this student's sprint cards."
-              when "Last Commit" then "<strong>Last Commit</strong><br><b>Metric:</b> Shows the latest GitHub commit timestamp available for this student in this sprint view.<br><b>Note:</b> Informational recency signal only; not a formula-based score."
-              when "PP"   then "<strong>Product Progress</strong><br><b>Metric:</b> Done ratio for sprint cards in scope, with completion band."
-              else "<strong>Metric</strong><br><b>Metric:</b> Description unavailable."
-            end %>
+  <div class="status-card-layout">
 
-            <th
-              class="sprint-group <%= sprint.parameterize %>"
-              data-bs-toggle="tooltip"
-              data-bs-html="true"
-              data-bs-placement="top"
-              title="<%= tooltip.html_safe %>"
-              style="font-size: 0.75rem;">
-              <%= item %>
-            </th>
-          <% end %>
-        <% end %>
-      </tr>
-    </thead>
+    <% sprint_list.each do |sprint| %>
+      <% sprint_key = sprint.parameterize %>
 
-    <tbody>
-      <% total_columns = 2 + (sprint_list.size * 6) + sponsor_columns.size %>
-      <% teams.each do |team| %>
-        <% team_summary = team_overview_by_id[team.id] || {} %>
-        <% team.students.each_with_index do |student, i| %>
-          <% student_metric_by_sprint = status_metrics.dig(team.id, student.id) || {} %>
-          <tr
-            data-team-filter="1"
-            data-team-id="<%= team.id %>"
-            data-at-risk="<%= team_summary[:any_at_risk] %>"
-            data-missing-done="<%= team_summary[:any_missing_sprint_done] %>">
-            <% if i == 0 %>
-              <td class="sticky-col-1" rowspan="<%= team.students.size + 1 %>">
-                <div class="sticky-cell">
-                  <%= link_to team.name, teams_path(semester), class: "text-decoration-none fw-semibold" %>
-                  <% if team_summary[:any_at_risk] %>
-                    <span class="team-risk-badge">At Risk</span>
-                  <% end %>
+      <div class="sprint-group <%= sprint_key %>">
+
+        <% teams.each do |team| %>
+          <% team_metric = team_sprint_metrics.dig(team.id, sprint) || {} %>
+
+          <div class="card mb-4">
+            <div class="card-header">
+              <strong><%= team.name %></strong>
+            </div>
+
+            <div class="card-body">
+
+              <div class="stage-layout" data-card-stage="planning">
+                <h6 class="fw-bold mb-2">Team Evaluation</h6>
+
+                <div class="table-responsive mb-4">
+                  <table class="table table-bordered text-center align-middle mb-0">
+                    <thead>
+                      <tr>
+                        <th>Feature Selection &amp; Decomposition</th>
+                        <th>Feature Assignments</th>
+                        <th>Kanban Updates</th>
+                      </tr>
+                    </thead>
+
+                    <tbody>
+                      <tr>
+                        <td>
+                          B: <%= team_metric[:backlog_cards] || 0 %> ·
+                          T: <%= team_metric[:todo_cards] || 0 %> ·
+                          IP: <%= team_metric[:in_progress_cards] || 0 %> ·
+                          D: <%= team_metric[:done_cards] || 0 %>
+                        </td>
+
+                        <td>
+                          <%= team.students.sum { |student|
+                            status_metrics.dig(
+                              team.id,
+                              student.id,
+                              sprint,
+                              :fa,
+                              :assigned_cards
+                            ).to_i
+                          } %>
+                        </td>
+
+                        <td>
+                          <% if team_metric[:ku_band] == "No Data" %>
+                            <span class="text-muted">No data available</span>
+                          <% else %>
+                            <%= team_metric[:ku_score] %>
+                            (<%= team_metric[:ku_band] %>)
+                          <% end %>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
                 </div>
-              </td>
-            <% end %>
 
-            <td class="sticky-col-2">
-              <div class="sticky-cell">
-                <%= "#{student.name.split.first} #{student.name.split.last&.first}." %>
+                <h6 class="fw-bold mb-2">Individual Evaluation</h6>
+
+                <div class="table-responsive">
+                  <table class="table table-bordered text-center align-middle mb-0">
+                    <thead>
+                      <tr>
+                        <th>Member</th>
+                        <th>Time Estimate</th>
+                      </tr>
+                    </thead>
+
+                    <tbody>
+                      <% team.students.each do |student| %>
+                        <% metric = status_metrics.dig(team.id, student.id, sprint) || {} %>
+
+                        <tr>
+                          <td>
+                            <%= "#{student.name.split.first} #{student.name.split.last&.first}." %>
+                          </td>
+
+                          <td>
+                            <%= metric.dig(:te, :estimated_hours) || 0 %>
+                          </td>
+                        </tr>
+                      <% end %>
+                    </tbody>
+                  </table>
+                </div>
               </div>
-            </td>
 
-            <% sprint_list.each do |sprint| %>
-              <% rubric_items.each do |item| %>
-                <% metric = student_metric_by_sprint[sprint] || {} %>
-                <td class="text-center sprint-group <%= sprint.parameterize %>">
-                  <% case item %>
-                    <% when "FS&D" %>
-                      <% fsd = metric[:fsd] || {} %>
-                      <%= "#{fsd[:backlog] || 0}, #{fsd[:todo] || 0}, #{fsd[:in_progress] || 0}, #{fsd[:done] || 0}" %>
-                    <% when "FA" %>
-                      <%= metric.dig(:fa, :assigned_cards) || 0 %>
-                    <% when "TE" %>
-                      <%= metric.dig(:te, :estimated_hours) || 0 %>
-                    <% when "TT" %>
-                      <%= metric.dig(:ts, :time_spent_hours) || 0 %>
-                    <% when "Last Commit" %>
-                      <span class="github-band"><%= formatted_last_commit_display(metric) %></span>
-                    <% when "PP" %>
-                      <% done_count = metric.dig(:fsd, :done).to_i %>
-                      <% total_count = metric.dig(:fa, :assigned_cards).to_i %>
-                      <%= (metric.dig(:pp, :completion_pct) || 0) %>% (<%= metric.dig(:pp, :band) || "No Data" %>)
-                      <div class="github-band"><%= done_count %>/<%= total_count %> done</div>
+              <div class="stage-layout" data-card-stage="progress">
 
-                    <% else %>
-                      <span>-</span>
-                  <% end %>
-                </td>
-              <% end %>
-            <% end %>
+                <h6 class="fw-bold mb-2">Team Evaluation</h6>
 
-            <% sponsor_columns.each do |sponsor_column| %>
-              <% if i == 0 %>
-                <td rowspan="<%= team.students.size + 1 %>" class="text-center align-middle sprint-group <%= sponsor_column[:css] %>">
-                  <% sprint_label = sponsor_column[:sprint] %>
-                  <% sprint_number = sprint_label.split.last %>
-                  <% sprint_key = sponsor_column[:css] %>
-                  <% attached = @sponsor_csv_attached[sprint_label] %>
-                  <div class="d-flex flex-column gap-2 align-items-center" data-sponsor-control="<%= sprint_key %>">
-                    <span>Sponsor Review</span>
-                    <%= form_with url: upload_sponsor_csv_semester_path(semester), method: :post, local: true, html: { multipart: true, class: "d-flex gap-1 flex-wrap justify-content-center", data: { sponsor_upload_form: "1", sponsor_sprint_key: sprint_key } } do %>
-                      <%= hidden_field_tag :sprint_number, sprint_number %>
-                      <%= file_field_tag :sponsor_csv, accept: ".csv", class: "form-control form-control-sm" %>
-                      <%= submit_tag "Upload", class: "btn btn-ui-primary btn-sm" %>
-                    <% end %>
+                <div class="table-responsive mb-4">
+                  <table class="table table-bordered text-center align-middle mb-0">
+                    <thead>
+                      <tr>
+                        <th>Client Communication</th>
+                        <th>Status &amp; Reflection</th>
+                      </tr>
+                    </thead>
 
-                    <div class="d-flex gap-2 <%= attached ? '' : 'd-none' %>" data-sponsor-actions>
-                      <button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#sponsorSummaryModal-<%= sprint_key %>">
-                        Summary
-                      </button>
-                      <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#sponsorQuestionsModal-<%= sprint_key %>">
-                        Questions
-                      </button>
-                    </div>
+                    <tbody>
+                      <tr>
+                        <td>
+                          <% client_score = @sponsor_scores_by_team.dig(team.name, sprint) %>
 
-                    <span class="text-muted small <%= attached ? 'd-none' : '' %>" data-sponsor-upload-hint>Upload CSV first</span>
-                    <span class="small" data-sponsor-upload-feedback></span>
-                  </div>
-                </td>
-              <% end %>
-            <% end %>
-          </tr>
+                          <% if client_score.nil? %>
+                            <span class="text-muted">No data available</span>
+                          <% else %>
+                            <%= client_score %>
+                          <% end %>
+                        </td>
+                        <td class="text-muted">No data available</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                <h6 class="fw-bold mb-2">Individual Evaluation</h6>
+
+                <div class="table-responsive">
+                  <table class="table table-bordered text-center align-middle mb-0">
+                    <thead>
+                      <tr>
+                        <th>Member</th>
+                        <th>Time Spent</th>
+                        <th>Product Progress</th>
+                        <th>Code Contribution &amp; Source Control</th>
+                      </tr>
+                    </thead>
+
+                    <tbody>
+                      <% team.students.each do |student| %>
+                        <% metric = status_metrics.dig(team.id, student.id, sprint) || {} %>
+                        <% done_count = metric.dig(:fsd, :done).to_i %>
+                        <% total_count = metric.dig(:fa, :assigned_cards).to_i %>
+
+                        <tr>
+                          <td>
+                            <%= "#{student.name.split.first} #{student.name.split.last&.first}." %>
+                          </td>
+
+                          <td>
+                            <%= metric.dig(:ts, :time_spent_hours) || 0 %>
+                          </td>
+
+                          <td>
+                            <%= metric.dig(:pp, :completion_pct) || 0 %>%
+                            (<%= metric.dig(:pp, :band) || "No Data" %>)
+
+                            <div class="github-band">
+                              <%= done_count %>/<%= total_count %> done
+                            </div>
+                          </td>
+
+                          <td>
+                            <% if metric.dig(:github, :data_available) %>
+
+                              <div>
+                                Commits: <%= metric.dig(:cbp, :commit_count).to_i %>
+                              </div>
+
+                              <div>
+                                Lines Changed: <%= metric.dig(:cbp, :lines_changed).to_i %>
+                              </div>
+
+                              <div>
+                                PRs:
+                                <%= metric.dig(:pr, :opened_count).to_i %> opened,
+                                <%= metric.dig(:pr, :merged_count).to_i %> merged
+                              </div>
+
+                              <div>
+                                Reviews: <%= metric.dig(:review, :review_count).to_i %>
+                              </div>
+
+                              <div class="small text-muted">
+                                Last Commit:
+                                <%= formatted_last_commit_display(metric) %>
+                              </div>
+
+                            <% else %>
+
+                              <span class="text-muted">
+                                GitHub data unavailable
+                              </span>
+
+                            <% end %>
+                          </td>
+                        </tr>
+                      <% end %>
+                    </tbody>
+
+                  </table>
+                </div>
+
+              </div>
+
+              <div class="stage-layout" data-card-stage="demo">
+
+                <h6 class="fw-bold mb-2">Team Evaluation</h6>
+
+                <div class="table-responsive mb-4">
+                  <table class="table table-bordered text-center align-middle mb-0">
+                    <thead>
+                      <tr>
+                        <th>Client Communication</th>
+                        <th>Demo</th>
+                      </tr>
+                    </thead>
+
+                    <tbody>
+                      <tr>
+                        <td>
+                          <% client_score = @sponsor_scores_by_team.dig(team.name, sprint) %>
+
+                          <% if client_score.nil? %>
+                            <span class="text-muted">No data available</span>
+                          <% else %>
+                            <%= client_score %>
+                          <% end %>
+                        </td>
+                        <td class="text-muted">No data available</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                <h6 class="fw-bold mb-2">Individual Evaluation</h6>
+
+                <div class="table-responsive">
+                  <table class="table table-bordered text-center align-middle mb-0">
+                    <thead>
+                      <tr>
+                        <th>Member</th>
+                        <th>Time Spent</th>
+                        <th>Product Progress</th>
+                        <th>Product Feedback</th>
+                        <th>Code Contribution &amp; Source Control</th>
+                        <th>Status &amp; Reflection</th>
+                      </tr>
+                    </thead>
+
+                    <tbody>
+                      <% team.students.each do |student| %>
+                        <% metric = status_metrics.dig(team.id, student.id, sprint) || {} %>
+                        <% done_count = metric.dig(:fsd, :done).to_i %>
+                        <% total_count = metric.dig(:fa, :assigned_cards).to_i %>
+
+                        <tr>
+                          <td>
+                            <%= "#{student.name.split.first} #{student.name.split.last&.first}." %>
+                          </td>
+
+                          <td>
+                            <%= metric.dig(:ts, :time_spent_hours) || 0 %>
+                          </td>
+
+                          <td>
+                            <%= metric.dig(:pp, :completion_pct) || 0 %>%
+                            (<%= metric.dig(:pp, :band) || "No Data" %>)
+
+                            <div class="github-band">
+                              <%= done_count %>/<%= total_count %> done
+                            </div>
+                          </td>
+
+                          <td class="text-muted">
+                            No data available
+                          </td>
+
+                          <td>
+                            <% if metric.dig(:github, :data_available) %>
+
+                              <div>
+                                Commits: <%= metric.dig(:cbp, :commit_count).to_i %>
+                              </div>
+
+                              <div>
+                                Lines Changed: <%= metric.dig(:cbp, :lines_changed).to_i %>
+                              </div>
+
+                              <div>
+                                PRs:
+                                <%= metric.dig(:pr, :opened_count).to_i %> opened,
+                                <%= metric.dig(:pr, :merged_count).to_i %> merged
+                              </div>
+
+                              <div>
+                                Reviews: <%= metric.dig(:review, :review_count).to_i %>
+                              </div>
+
+                              <div class="small text-muted">
+                                Last Commit:
+                                <%= formatted_last_commit_display(metric) %>
+                              </div>
+
+                            <% else %>
+
+                              <span class="text-muted">
+                                GitHub data unavailable
+                              </span>
+
+                            <% end %>
+                          </td>
+                          <td class="text-muted">
+                            No data available
+                          </td>
+                        </tr>
+                      <% end %>
+                    </tbody>
+                  </table>
+                </div>
+
+              </div>
+              
+            </div>
+          </div>
+
         <% end %>
+        <% if ["Sprint 2", "Sprint 3", "Sprint 4"].include?(sprint) %>
+          <% sprint_number = sprint.split.last %>
+          <% attached = @sponsor_csv_attached[sprint] %>
 
-        <tr
-          class="team-total-row"
-          data-team-filter="1"
-          data-team-id="<%= team.id %>"
-          data-at-risk="<%= team_summary[:any_at_risk] %>"
-          data-missing-done="<%= team_summary[:any_missing_sprint_done] %>">
-          <td class="sticky-col-2"><strong>Total</strong></td>
+          <div class="sponsor-response-section mt-4 pt-3 border-top">
+            <h6 class="fw-bold mb-2">Sponsor Response</h6>
 
-          <% sprint_list.each do |sprint| %>
-            <% rubric_items.each do |item| %>
-              <% team_metric = team_sprint_metrics.dig(team.id, sprint) || {} %>
-              <td class="text-center sprint-group <%= sprint.parameterize %>">
-                <% case item %>
-                  <% when "FS&D" %>
-                    <strong><%= "#{team_metric[:backlog_cards] || 0}, #{team_metric[:todo_cards] || 0}, #{team_metric[:in_progress_cards] || 0}, #{team_metric[:done_cards] || 0}" %></strong>
-                  <% when "FA" %>
-                    <strong><%= team.students.sum { |s| status_metrics.dig(team.id, s.id, sprint, :fa, :assigned_cards).to_i } %></strong>
-                  <% when "TE" %>
-                    <strong><%= team_metric[:estimated_hours] || 0 %></strong>
-                  <% when "TT" %>
-                    <strong><%= team_metric[:time_spent_hours] || 0 %></strong>
-                  <% when "Last Commit" %>
-                    <strong class="github-band"><%= team_last_commit_summary(team: team, sprint: sprint, status_metrics: status_metrics) %></strong>
-                  <% when "PP" %>
-                    <strong><%= team_metric[:pp_completion_pct] || 0 %>% (<%= team_metric[:pp_band] || "No Data" %>)</strong>
-                    <div class="github-band"><%= team_metric[:done_cards].to_i %>/<%= team_metric[:total_cards].to_i %> done</div>
-                  <% else %>
-                    <span>-</span>
-                <% end %>
-              </td>
-            <% end %>
-          <% end %>
+            <div
+              class="d-flex flex-column gap-2 align-items-center"
+              data-sponsor-control="<%= sprint_key %>">
 
-        </tr>
-        <tr class="team-spacer" aria-hidden="true">
-          <td colspan="<%= total_columns %>" style="height: 18px; background: #f8fafc;"></td>
-        </tr>
-      <% end %>
-    </tbody>
-  </table>
+              <%= form_with url: upload_sponsor_csv_semester_path(semester),
+                method: :post,
+                local: true,
+                html: {
+                  multipart: true,
+                  class: "d-flex gap-2 flex-wrap justify-content-center",
+                  data: {
+                    sponsor_upload_form: "1",
+                    sponsor_sprint_key: sprint_key
+                  }
+                } do %>
+
+                <%= hidden_field_tag :sprint_number, sprint_number %>
+
+                <%= file_field_tag :sponsor_csv,
+                  accept: ".csv",
+                  class: "form-control form-control-sm" %>
+
+                <%= submit_tag "Upload",
+                  class: "btn btn-ui-primary btn-sm" %>
+
+              <% end %>
+
+              <div
+                class="d-flex gap-2 <%= attached ? '' : 'd-none' %>"
+                data-sponsor-actions>
+
+                <button
+                  type="button"
+                  class="btn btn-outline-primary btn-sm"
+                  data-bs-toggle="modal"
+                  data-bs-target="#sponsorSummaryModal-<%= sprint_key %>">
+                  Summary
+                </button>
+
+                <button
+                  type="button"
+                  class="btn btn-outline-secondary btn-sm"
+                  data-bs-toggle="modal"
+                  data-bs-target="#sponsorQuestionsModal-<%= sprint_key %>">
+                  Questions
+                </button>
+
+              </div>
+
+              <span
+                class="text-muted small <%= attached ? 'd-none' : '' %>"
+                data-sponsor-upload-hint>
+                Upload CSV first
+              </span>
+
+              <span
+                class="small"
+                data-sponsor-upload-feedback>
+              </span>
+
+            </div>
+          </div>
+        <% end %>
+      </div>
+      
+    <% end %>
+    
+  </div>
+
 </div>

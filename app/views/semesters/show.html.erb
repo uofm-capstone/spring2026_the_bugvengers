@@ -67,12 +67,40 @@
       // Sprint filter
       const buttons = document.querySelectorAll(".sprint-toggle");
       const groups  = document.querySelectorAll(".sprint-group");
+      const stageButtons = document.querySelectorAll(".stage-toggle");
 
       if (!buttons.length || !groups.length) return;
+      function applyStatusFilters() {
+        const activeSprint =
+          document.querySelector(".sprint-toggle.active")?.dataset.sprint;
 
-      // Default: All visible
-      groups.forEach(g => g.style.display = "");
+        const activeStage =
+          document.querySelector(".stage-toggle.active")?.dataset.stage;
 
+        groups.forEach(group => {
+          const matchesSprint = group.classList.contains(activeSprint);
+          // Sprint headings/sponsor columns do not have stage-group
+          if (!group.classList.contains("stage-group")) {
+            group.style.display = matchesSprint ? "" : "none";
+            return;
+          }
+
+          const stages = (group.dataset.stage || "").split(" ");
+          const matchesStage = stages.includes(activeStage);
+
+          group.style.display =
+          matchesSprint && matchesStage ? "" : "none";
+        });
+        
+        const cardStages = document.querySelectorAll("[data-card-stage]");
+
+        cardStages.forEach(stage => {
+          stage.style.display =
+            stage.dataset.cardStage === activeStage ? "" : "none";
+        });
+        
+      }
+      // Sprint buttons
       buttons.forEach(btn => {
         // avoid double-binding
         if (btn.dataset.sprintBound === "1") return;
@@ -82,20 +110,27 @@
           buttons.forEach(b => b.classList.remove("active"));
           btn.classList.add("active");
 
-          const key = btn.dataset.sprint;  // "all" or e.g. "sprint-1"
+          applyStatusFilters();
+        });
+      });
+      // Stage buttons
+      stageButtons.forEach(btn => {
+        // avoid double-binding
+        if (btn.dataset.stageBound === "1") return;
+        btn.dataset.stageBound = "1";
 
-          if (key === "all") {
-            groups.forEach(g => g.style.display = "");
-          } else {
-            groups.forEach(g => {
-              g.style.display = g.classList.contains(key) ? "" : "none";
-            });
-          }
+        btn.addEventListener("click", () => {
+          stageButtons.forEach(b => b.classList.remove("active"));
+          btn.classList.add("active");
+
+          applyStatusFilters();
         });
       });
 
-    } 
-
+      // Apply default active Sprint + Stage when page loads
+      applyStatusFilters();
+    }
+      
     let statusProgressTimer;
     let statusElapsedTimer;
     let statusElapsedSeconds = 0;
@@ -132,6 +167,12 @@
       statusElapsedTimer = setInterval(() => {
         statusElapsedSeconds += 1;
         if (elapsed) elapsed.textContent = `Elapsed: ${statusElapsedSeconds}s`;
+
+        if (statusElapsedSeconds > 12 && statusElapsedSeconds <= 25) {
+          setStatusProgress(value, "Still working... checking GitHub activity.");
+        } else if (statusElapsedSeconds > 25) {
+          setStatusProgress(value, "Still working... this first load can take longer.");
+        }
 
         if (statusElapsedSeconds > 12 && statusElapsedSeconds <= 25) {
           setStatusProgress(value, "Still working... checking GitHub activity.");

@@ -13,6 +13,7 @@ class LlmServiceStandaloneTest < Minitest::Test
   def build_service(**overrides)
     defaults = {
       api_url: "http://34.10.73.251:11434",
+      model: "gemma:2b",
       logger: Logger.new(nil)
     }
 

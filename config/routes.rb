@@ -27,6 +27,9 @@ Rails.application.routes.draw do
   get 'semesters/:id/classlist', to: 'semesters#classlist', as: 'semester_classlist' 
   post 'semesters/:id/upload_sprint_csv', to: 'semesters#upload_sprint_csv', as: 'upload_sprint_csv_semester'
 
+  # Survey controller
+  get "client_status_survey", to: "pages#client_status_survey", as: :client_status_survey
+
   # Student controller
   get 'students', to: 'students#index', as: 'students'
   post 'students', to: 'students#create'
@@ -78,4 +81,3 @@ Rails.application.routes.draw do
   get 'users/forced_password_change', to: 'users/forced_password_changes#edit', as: 'forced_password_change'
   patch 'users/forced_password_change', to: 'users/forced_password_changes#update'
 end
-

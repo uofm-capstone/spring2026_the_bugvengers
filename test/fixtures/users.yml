@@ -1,0 +1,14 @@
+# Test users referenced by login_logs.yml
+
+one:
+  email: testuser1@example.com
+  encrypted_password: ""
+  is_active: true
+  role: 3
+  admin: true
+  temp_password_changed: true
+
+two:
+  email: testuser2@example.com
+  encrypted_password: ""
+  is_active: true

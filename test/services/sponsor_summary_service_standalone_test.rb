@@ -119,7 +119,7 @@ class SponsorSummaryServiceStandaloneTest < Minitest::Test
 
     assert_equal false, result[:ok]
     assert_equal "parse_error", result[:error_code]
-    assert_includes result[:summary_text], "Overall sentiment: Mixed"
+    assert_includes result[:summary_text], "Overall sentiment: N/A"
   end
 
   def test_generate_returns_fallback_when_llm_fails

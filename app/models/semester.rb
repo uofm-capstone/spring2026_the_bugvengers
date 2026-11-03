@@ -524,9 +524,9 @@ def import_students_from_csv
     header_candidates = {
       name: ["full name", "fullname", "name"],
       email: ["email", "e-mail", "e mail"],
-      team: ["team", "group"],
+      team: ["team", "team name", "group"],
       github_username: ["github username", "github_username", "github"],
-      repo_url: ["repo url", "repository link", "repository", "repo"],
+      repo_url: ["repo url", "repository link", "github repository link", "repository", "repo"],
       project_board: ["github project board link", "project board", "project_board"],
       timesheet: ["timesheet link", "timesheet", "timesheet_url"],
       client_notes: ["client meeting notes link", "client meeting notes", "client_notes"]
@@ -607,20 +607,13 @@ def import_students_from_csv
           next
         end
 
-        # URL validation
-        url_fields = {
-          "Repo URL" => repo_url,
-          "Project Board URL" => project_board,
-          "Timesheet URL" => timesheet,
-          "Client Notes URL" => client_notes
-        }
-        url_fields.each do |label, url|
-          if url.present? && !(url =~ /\Ahttps?:\/\/[\S]+\z/)
-            row_errors << "Row #{i + 2}: #{label} is invalid: #{url}"
-            skipped_count += 1
-            next
-          end
-        end
+        # Ignore invalid optional URLs instead of failing the entire student row
+        valid_url = ->(url) { url.present? && url.match?(/\Ahttps?:\/\/\S+\z/) }
+
+        repo_url      = nil if repo_url.present? && !valid_url.call(repo_url)
+        project_board = nil if project_board.present? && !valid_url.call(project_board)
+        timesheet     = nil if timesheet.present? && !valid_url.call(timesheet)
+        client_notes  = nil if client_notes.present? && !valid_url.call(client_notes)
 
         # Create/find team
         team = teams.find_or_create_by!(name: team_name) if team_name.present?

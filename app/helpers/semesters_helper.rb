@@ -55,6 +55,14 @@ module SemestersHelper
     "is-risk"
   end
 
+  def product_progress_state_class(score)
+    value = score.to_f
+    return "is-strong" if value >= 80
+    return "is-watch" if value >= 60
+
+    "is-risk"
+  end
+
   def compact_score(value)
     format("%.1f", value.to_f)
   end

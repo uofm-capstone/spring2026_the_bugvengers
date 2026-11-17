@@ -1,25 +1,13 @@
 # Read about fixtures at https://api.rubyonrails.org/classes/ActiveRecord/FixtureSet.html
 
-<<<<<<< HEAD
 one:
-  full_name: MyString
-  email: MyString
-  github_username: MyString
-  team_name: MyString
+  full_name: Student One
+  email: student1@example.com
+  github_username: student_one
+  team_name: Test Team
 
 two:
-  full_name: MyString
-  email: MyString
-  github_username: MyString
-  team_name: MyString
-=======
-# This model initially had no columns defined. If you add columns to the
-# model remove the "{}" from the fixture names and add the columns immediately
-# below each fixture, per the syntax in the comments below
-#
-one: {}
-# column: value
-#
-two: {}
-# column: value
->>>>>>> 35cab7f7fefc78673fb0fbb48fc7e024c518db70
+  full_name: Student Two
+  email: student2@example.com
+  github_username: student_two
+  team_name: Test Team

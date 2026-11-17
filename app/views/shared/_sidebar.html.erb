@@ -1,3 +1,4 @@
+
 <aside class="app-sidebar" aria-label="Primary navigation">
   <div class="app-sidebar__header">Navigation</div>
 
@@ -16,6 +17,10 @@
 
     <%= nav_link_to "Status", status_page_path, class: "app-sidebar__link", active_when: { controller: "semesters", action: "status" } do %>
       <i class="bi bi-bar-chart me-2" aria-hidden="true"></i> Status
+    <% end %>
+
+    <%= nav_link_to "Student Survey", student_survey_path, class: "app-sidebar__link", active_when: { controller: "pages", action: "student_survey" } do %>
+      <i class="bi bi-clipboard-check me-2" aria-hidden="true"></i> Student Survey
     <% end %>
   </nav>
 </aside>

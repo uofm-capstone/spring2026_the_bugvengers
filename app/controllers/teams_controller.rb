@@ -65,7 +65,9 @@ class TeamsController < ApplicationController
   end
   
   def update
-    if @team.update(team_params)
+  attributes = team_params
+  attributes.delete(:github_token) if attributes[:github_token].blank?
+  if @team.update(attributes)
       redirect_to teams_path, notice: 'Team was successfully updated.'
     else
       @current_semester = session[:last_viewed_semester_id]

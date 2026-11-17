@@ -18,12 +18,22 @@
           <span>Taken: <%= payload[:total_spent] %>h</span>
           <span>Done Missing TT: <%= payload[:cards_missing_spent] %></span>
           <span>Repo: <%= payload[:github_repo] || "N/A" %></span>
-          <span>GitHub Score: <%= payload.dig(:github_scores, :score) || 0 %>%</span>
-          <span>Data Available: <%= payload.dig(:github_scores, :data_available) ? "Yes" : "No" %></span>
-          <span>Missing Flags: <%= format_missing_github_flags(payload.dig(:github_scores, :missing_data_flags)) %></span>
-          <span>CBP: <%= payload.dig(:github_scores, :cbp_score) || 0 %></span>
-          <span>PR: <%= payload.dig(:github_scores, :pr_score) || 0 %></span>
-          <span>RVW: <%= payload.dig(:github_scores, :review_score) || 0 %></span>
+          <% github_scores = payload[:github_scores] || {} %>
+
+          <span>Data Available: <%= github_scores[:data_available] ? "Yes" : "No" %></span>
+          <span>Missing Flags: <%= format_missing_github_flags(github_scores[:missing_data_flags]) %></span>
+
+          <% if github_scores[:data_available] %>
+            <span>GitHub Score: <%= github_scores[:score] || 0 %>%</span>
+            <span>CBP: <%= github_scores[:cbp_score] || 0 %></span>
+            <span>PR: <%= github_scores[:pr_score] || 0 %></span>
+            <span>RVW: <%= github_scores[:review_score] || 0 %></span>
+          <% else %>
+            <span>GitHub Score: N/A</span>
+            <span>CBP: N/A</span>
+            <span>PR: N/A</span>
+            <span>RVW: N/A</span>
+          <% end %>
         </div>
 
         <details class="github-inspector-card-samples">

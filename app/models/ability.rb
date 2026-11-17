@@ -47,8 +47,7 @@ class Ability
       if user.student?
         can :read, Semester
         can :read, Sprint
-        can :read, Team
-        can :read, Team, user_teams: { user_id: user.id } # Students can view teams they belong to
+        can :read, Team, student_teams: { student: { user_id: user.id } } # Students can view teams they belong to
         can :read, Repository
         # can :read, Repository, team: { user_teams: { user_id: user.id } }
       end

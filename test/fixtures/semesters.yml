@@ -1,0 +1,11 @@
+# Test semester records
+
+one:
+  year: 2025
+  semester: Fall
+  description: Test Fall semester
+
+two:
+  year: 2026
+  semester: Spring
+  description: Test Spring semester

@@ -13,7 +13,7 @@ class CSVSurveyParserServiceStandaloneTest < Minitest::Test
   end
 
   def test_parses_client_feedback_csv
-    csv_path = File.join(ROOT, "client_feedback.csv")
+    csv_path = File.join(ROOT, "test", "fixtures", "files", "client_feedback.csv")
     csv_string = File.read(csv_path)
 
     result = service_from_csv(csv_string).parse

@@ -37,7 +37,7 @@
 
   <div class="mb-3">
     <%= form.label :github_token, class: "form-label" %>
-    <%= form.text_field :github_token, class: "form-control" %>
+    <%= form.password_field :github_token, value: "", class: "form-control", placeholder: "Leave blank to keep current token", autocomplete: "new-password" %>
   </div>
 
   <% if !team.nil? %>

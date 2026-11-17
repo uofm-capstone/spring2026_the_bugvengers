@@ -92,11 +92,19 @@ class StudentRosterImportService
         }
         url_fields.each do |label, url|
           if url.present? && !(url =~ /\Ahttps?:\/\/[\S]+\z/)
-            row_errors << "Row #{i + 2}: #{label} is invalid: #{url}"
-            skipped_count += 1
-            next
+            row_errors << "Row #{i + 2}: #{label} is invalid"
+            case label
+            when "Repo URL"
+              repo_url = nil
+            when "Project Board URL"
+              project_board = nil
+            when "Timesheet URL"
+              timesheet = nil
+            when "Client Notes URL"
+              client_notes = nil
+            end
           end
-        end
+        end 
 
         team = @semester.teams.find_or_create_by!(name: team_name) if team_name.present?
         if team
@@ -153,7 +161,14 @@ class StudentRosterImportService
     summary = "#{created_count} created, #{updated_count} updated, #{skipped_count} skipped."
 
     if row_errors.any?
-      return failure("Import completed with errors. #{summary} Details: #{row_errors.join(' | ')}")
+      details = row_errors.first(3).join(" | ")
+      remaining = row_errors.length - 3
+
+      if remaining > 0
+        details += " | And #{remaining} more errors."
+      end
+
+      return failure("Import completed with errors. #{summary} Details: #{details}")
     end
 
     success("Import completed successfully. #{summary}")

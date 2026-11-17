@@ -1,0 +1,45 @@
+<div class="card mt-4">
+  <div class="card-body">
+    <h2 class="text-center">Demo Day</h2>
+
+    <div class="table-responsive mt-3">
+      <table class="table table-bordered">
+        <thead>
+          <tr>
+            <th>Team</th>
+
+            <% sprint_list.each do |sprint| %>
+              <th><%= sprint %></th>
+            <% end %>
+          </tr>
+        </thead>
+
+        <tbody>
+          <% teams.each do |team| %>
+            <tr>
+              <td><%= team.name %></td>
+
+              <% sprint_list.each do |sprint| %>
+                <% metric = team_sprint_metrics.dig(team.id, sprint) || {} %>
+
+                <td>
+                  <% if metric[:total_cards].to_i > 0 %>
+                    <%= metric[:pp_completion_pct] || 0 %>%
+                    (<%= metric[:pp_band] || "No Data" %>)
+                  <% else %>
+                    No Data
+                  <% end %>
+                </td>
+              <% end %>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+
+    <p class="text-muted small">
+      Displays existing sprint product progress. Demo Day evaluation criteria
+      will be applied when the rubric is defined.
+    </p>
+  </div>
+</div>

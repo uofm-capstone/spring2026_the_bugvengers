@@ -23,7 +23,7 @@
             <strong><%= sprint %></strong>
             <span>Done: <%= sprint_metric[:sprint_done_cards] || 0 %></span>
             <span>Taken: <%= sprint_metric[:time_spent_hours] || 0 %>h</span>
-            <% if github_metric[:data_available] || github_metric[:score].to_f.positive? %>
+            <% if github_metric[:data_available] %>
               <span>GitHub: <%= github_metric[:score] || 0 %>%</span>
               <span><%= github_metric[:band] || "No Data" %></span>
             <% else %>

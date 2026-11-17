@@ -921,8 +921,10 @@ end
     GithubService::BoardHealth.new([], [], false, [])
   end
 
+  # Allow additional time for GitHub API requests to retrieve sprint metrics.
+  # The previous 4-second limit caused premature timeouts and incomplete results on the Team Status Page
   def safe_github_sprint_metrics(team_service:, repo:, sprint:, students:, team:, cache_version: nil, force_refresh: false)
-    Timeout.timeout(4) do
+    Timeout.timeout(30) do
       build_github_sprint_metrics(
         team_service: team_service,
         repo: repo,
@@ -1063,7 +1065,8 @@ end
       (pr_score * GITHUB_SCORE_WEIGHTS[:pr]) +
       (review_score * GITHUB_SCORE_WEIGHTS[:review])
     ).round(1)
-    github_band = if assigned_card_count.zero? && !has_non_kanban_github_data
+    github_band = if !github_student_metrics[:data_available] ||
+                    (assigned_card_count.zero? && !has_non_kanban_github_data)
       "No Data"
     else
       github_band_for(github_score)
@@ -1237,8 +1240,8 @@ end
     return empty_team_github_metrics(missing_data_flags: ["repo_missing"]) if repo.blank?
     return empty_team_github_metrics(repo: repo, missing_data_flags: ["token_unavailable"]) unless team_service.available?
 
-    start_date = sprint.start_date || Date.current.beginning_of_month
-    end_date = sprint.end_date || Date.current.end_of_month
+    start_date = (sprint.start_date || Date.current.beginning_of_month).beginning_of_day
+    end_date = (sprint.end_date || Date.current.end_of_month).end_of_day
     fallback_end_date = end_date.respond_to?(:to_date) ? end_date.to_date : Date.current
     fallback_start_date = fallback_end_date - 180.days
 
@@ -1347,8 +1350,8 @@ end
     return empty_team_github_metrics(missing_data_flags: ["repo_missing"]) if repo.blank?
     return empty_team_github_metrics(repo: repo, missing_data_flags: ["token_unavailable"]) unless team_service.available?
 
-    start_date = sprint.start_date || Date.current.beginning_of_month
-    end_date = sprint.end_date || Date.current.end_of_month
+    start_date = (sprint.start_date || Date.current.beginning_of_month).beginning_of_day
+    end_date = (sprint.end_date || Date.current.end_of_month).end_of_day
     fallback_end_date = end_date.respond_to?(:to_date) ? end_date.to_date : Date.current
     fallback_start_date = fallback_end_date - 180.days
 
@@ -1376,8 +1379,8 @@ end
                        lookup_user_metric(fallback_last_commit_at_by_user, username)
 
       per_student[username] = {
-        data_available: true,
-        missing_data_flags: [],
+        data_available: false,
+        missing_data_flags: Array(missing_data_flags),
         last_commit_at: last_commit_at,
         cbp: { commit_count: 0, lines_added: 0, lines_removed: 0, lines_changed: 0 },
         pr: { opened_count: 0, merged_count: 0, open_count: 0, avg_merge_hours: 0.0 },
@@ -1386,7 +1389,7 @@ end
     end
 
     {
-      data_available: true,
+      data_available: false,
       repo: repo,
       cbp: { total_commits: 0, total_lines_changed: 0, active_contributors: 0 },
       pr: { opened_count: 0, merged_count: 0, open_count: 0, avg_merge_hours: 0.0 },
@@ -1547,6 +1550,9 @@ end
     (numerator.to_f / denominator.to_f) * 100.0
   end
 
+  # Recognizes completed tasks assigned to a specific sprint.
+  # Supports GitHub Project status names such as "Done Archive (Sprint 2)"
+  # so archived tasks are included in sprint progress calculations.
   def done_in_sprint_status?(status, sprint_name)
     return false if status.blank? || sprint_name.blank?
 
@@ -1554,13 +1560,22 @@ end
     return false if sprint_number.blank?
 
     normalized = status.to_s.strip.downcase
-    normalized.match?(/\Adone in sprint\s*#{Regexp.escape(sprint_number)}\z/)
+
+    normalized.match?(
+      /\A(?:done in sprint\s*#{Regexp.escape(sprint_number)}|done archive\s*\(sprint\s*#{Regexp.escape(sprint_number)}\))\z/
+    )
   end
 
+  # Identify completed tasks across all sprints, including tasks
+  # moved into sprint-specific archive columns on the GitHub board.
   def done_in_any_sprint_status?(status)
     return false if status.blank?
 
-    status.to_s.strip.downcase.match?(/\Adone in sprint\s*\d+\z/)
+    normalized = status.to_s.strip.downcase
+
+    normalized.match?(
+      /\A(?:done in sprint\s*\d+|done archive\s*\(sprint\s*\d+\))\z/
+    )
   end
 
   def sprint_in_progress?(sprint)
@@ -1606,6 +1621,9 @@ end
     )
   end
 
+  # Retrieve actual hours worked from a GitHub Project task.
+  # Include "Completed Time" to support the custom field used
+  # by the current team's project board.
   def spent_value(card)
     numeric_field(
       card,
@@ -1614,7 +1632,8 @@ end
       "Hours Spent",
       "Spent",
       "Actual Time",
-      "Time Logged"
+      "Time Logged",
+      "Completed Time"
     )
   end
 
@@ -1718,14 +1737,16 @@ end
     end
   end
 
+  # Identify the currently active sprint using its scheduled dates.
+  # Untagged GitHub Project tasks are associated with the active sprint
+  # rather than a future sprint that has not started.
   def latest_sprint_in_semester?(sprint)
-    return false if sprint.blank? || @sprints.blank?
+    return false if sprint.blank? || sprint.start_date.blank? || sprint.end_date.blank?
 
-    current_number = sprint.name.to_s[/\d+/].to_i
-    sprint_numbers = @sprints.map { |item| item.name.to_s[/\d+/].to_i }.select(&:positive?)
-    return current_number == sprint_numbers.max if current_number.positive? && sprint_numbers.any?
+    today = Time.zone.today
 
-    @sprints.last == sprint
+    sprint.start_date.to_date <= today &&
+      sprint.end_date.to_date >= today
   end
 
   def card_matches_sprint?(card, sprint)

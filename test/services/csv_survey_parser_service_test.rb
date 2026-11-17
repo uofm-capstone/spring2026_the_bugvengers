@@ -3,7 +3,7 @@ require "test_helper"
 class CSVSurveyParserServiceTest < ActiveSupport::TestCase
   # Verifies real sample CSV produces both grouped team output and respondent details.
   test "parses client_feedback csv into grouped dataset" do
-    file_path = Rails.root.join("client_feedback.csv")
+    file_path = Rails.root.join("test/fixtures/files/client_feedback.csv")
 
     result = CSVSurveyParserService.new(file: file_path.to_s).parse
 
@@ -39,7 +39,7 @@ class CSVSurveyParserServiceTest < ActiveSupport::TestCase
     csv_string = <<~CSV
       Q1,Q3,Q6
       Team,Sprint,Question
-      {"ImportId":"QID1"},{"ImportId":"QID3"},{"ImportId":"QID6_TEXT"}
+      "{""ImportId"":""QID1""}","{""ImportId"":""QID3""}","{""ImportId"":""QID6_TEXT""}"
       Team A,Sprint 1,Some text
     CSV
 
@@ -54,7 +54,7 @@ class CSVSurveyParserServiceTest < ActiveSupport::TestCase
     csv_string = <<~CSV
       Q1,Q3,Q7
       Team,Sprint,Feedback
-      {"ImportId":"QID1"},{"ImportId":"QID3"},{"ImportId":"QID7_TEXT"}
+      "{""ImportId"":""QID1""}","{""ImportId"":""QID3""}","{""ImportId"":""QID7_TEXT""}"
       ,Sprint 1,Need faster updates
     CSV
 
@@ -70,7 +70,7 @@ class CSVSurveyParserServiceTest < ActiveSupport::TestCase
     csv_string = <<~CSV
       Q1,Q3,Q7
       Team,Sprint,Feedback
-      {"ImportId":"QID1"},{"ImportId":"QID3"},{"ImportId":"QID7_TEXT"}
+      "{""ImportId"":""QID1""}","{""ImportId"":""QID3""}","{""ImportId"":""QID7_TEXT""}"
       Team A,Sprint 2,
       Team A,Sprint 2,Great progress
     CSV

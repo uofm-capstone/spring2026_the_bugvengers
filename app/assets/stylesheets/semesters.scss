@@ -57,6 +57,7 @@
     bottom: calc(100% + 8px);
     transform: translateX(-50%);
     z-index: 1080;
+    width: max-content;
 
     display: none;
     max-width: 260px;

@@ -217,3 +217,40 @@
   padding: 1px 6px;
   line-height: 1.3;
 }
+
+.status-card-layout {
+  .card {
+    margin-bottom: 0.75rem !important;
+  }
+
+  .card-header {
+    padding: 0.35rem 0.75rem;
+  }
+
+  .card-body {
+    padding: 0.5rem 0.75rem;
+  }
+
+  .stage-layout h6 {
+    margin-top: 0.35rem;
+    margin-bottom: 0.35rem !important;
+  }
+
+  .stage-layout .table-responsive {
+    margin-bottom: 0.5rem !important;
+  }
+
+  .stage-layout .table th,
+  .stage-layout .table td {
+    padding: 0.3rem 0.5rem;
+  }
+
+  .stage-layout .alert {
+    padding: 0.5rem;
+    margin-bottom: 0.5rem !important;
+  }
+
+  .sponsor-response-section {
+    margin-top: 0.75rem;
+  }
+}

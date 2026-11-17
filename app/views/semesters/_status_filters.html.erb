@@ -1,15 +1,38 @@
-<!-- Sprint + Team Filters -->
+<!-- Sprint + Rubric Stage Filters -->
 <div class="text-center mb-3 semesters-status__filters">
-  <button class="btn btn-outline-primary m-1 sprint-toggle semesters-status__filter-btn active" data-sprint="all">
-    All
-  </button>
 
-  <% sprint_list.each do |sprint| %>
+  <div class="mb-2">
+    <strong class="me-2">Sprint:</strong>
+
+    <% sprint_list.each_with_index do |sprint, index| %>
+      <button
+        class="btn btn-outline-primary m-1 sprint-toggle semesters-status__filter-btn <%= 'active' if index == 0 %>"
+        data-sprint="<%= sprint.parameterize %>">
+        <%= sprint %>
+      </button>
+    <% end %>
+  </div>
+
+  <div>
+    <strong class="me-2">Stage:</strong>
+
     <button
-      class="btn btn-outline-primary m-1 sprint-toggle semesters-status__filter-btn"
-      data-sprint="<%= sprint.parameterize %>">
-      <%= sprint %>
+      class="btn btn-outline-secondary m-1 stage-toggle semesters-status__filter-btn active"
+      data-stage="planning">
+      Planning
     </button>
-  <% end %>
-</div>
 
+    <button
+      class="btn btn-outline-secondary m-1 stage-toggle semesters-status__filter-btn"
+      data-stage="progress">
+      Progress Check
+    </button>
+
+    <button
+      class="btn btn-outline-secondary m-1 stage-toggle semesters-status__filter-btn"
+      data-stage="demo">
+      Demo Day
+    </button>
+  </div>
+
+</div>
